@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  n8n-workflow-builder:
+    build: .
+    container_name: n8n-workflow-builder
+    environment:
+      - N8N_API_URL=${N8N_API_URL}
+      - N8N_API_KEY=${N8N_API_KEY}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped

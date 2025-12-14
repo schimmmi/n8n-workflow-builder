@@ -548,8 +548,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 if not suggestions:
                     return [TextContent(
                         type="text",
-                        text="Ich konnte keine spezifischen Nodes für diese Beschreibung finden. "
-                             "Beschreibe bitte genauer, was der Workflow tun soll!"
+                        text="I couldn't find specific nodes for this description. "
+                             "Please describe in more detail what the workflow should do!"
                     )]
                 
                 outline = workflow_builder.generate_workflow_outline(description, suggestions)
@@ -566,7 +566,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 if template_type in WORKFLOW_TEMPLATES:
                     template = WORKFLOW_TEMPLATES[template_type]
                     outline += f"\n## Template: {template['name']}\n\n"
-                    outline += "Empfohlene Node-Struktur:\n"
+                    outline += "Recommended Node Structure:\n"
                     for i, node in enumerate(template['nodes'], 1):
                         outline += f"{i}. {node['name']} ({node['type']})\n"
                 

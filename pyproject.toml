@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "n8n-workflow-builder"
+version = "1.0.0"
+description = "Advanced MCP server for n8n workflow creation, optimization, and management"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["n8n", "workflow", "automation", "mcp", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "mcp",
+    "httpx",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/n8n-workflow-builder"
+Repository = "https://github.com/yourusername/n8n-workflow-builder"
+Issues = "https://github.com/yourusername/n8n-workflow-builder/issues"
+
+[project.scripts]
+n8n-workflow-builder = "n8n_workflow_builder.server:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["n8n_workflow_builder"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"

@@ -3,22 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
 
 # Virtual Environment
 .venv/
@@ -26,7 +13,7 @@ venv/
 ENV/
 env/
 
-# Environment variables
+# Environment files
 .env
 .env.local
 
@@ -35,11 +22,23 @@ env/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+
+# Tests
+tests/
+
+# Examples
+examples/
 
 # Logs
 *.log

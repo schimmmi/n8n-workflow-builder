@@ -82,7 +82,10 @@ async def test_n8n_connection():
 
 async def test_workflow_builder():
     """Test workflow builder logic"""
-    from server import WorkflowBuilder
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+    from n8n_workflow_builder.server import WorkflowBuilder
     
     print("\n\n🧠 Testing Workflow Builder AI...")
     
