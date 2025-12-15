@@ -103,24 +103,77 @@ python server.py
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
+#### Option 1: With Virtual Environment (Recommended)
 ```json
 {
   "mcpServers": {
     "n8n-workflow-builder": {
-      "command": "python",
-      "args": [
-        "/ABSOLUTER/PFAD/ZU/n8n-workflow-builder/server.py"
-      ],
+      "command": "/ABSOLUTE/PATH/TO/n8n-workflow-builder/.venv/bin/python",
+      "args": ["-m", "n8n_workflow_builder"],
       "env": {
         "N8N_API_URL": "https://your-n8n-instance.com",
-        "N8N_API_KEY": "dein_api_key_hier"
+        "N8N_API_KEY": "your_api_key_here"
       }
     }
   }
 }
 ```
 
-**WICHTIG**: Ersetze `/ABSOLUTER/PFAD/ZU/` mit deinem echten Pfad!
+#### Option 2: With Global Python
+```json
+{
+  "mcpServers": {
+    "n8n-workflow-builder": {
+      "command": "python",
+      "args": [
+        "-m", "n8n_workflow_builder"
+      ],
+      "env": {
+        "N8N_API_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your_api_key_here",
+        "PYTHONPATH": "/ABSOLUTE/PATH/TO/n8n-workflow-builder/src"
+      }
+    }
+  }
+}
+```
+
+#### Option 3: Direct with server.py (Legacy)
+```json
+{
+  "mcpServers": {
+    "n8n-workflow-builder": {
+      "command": "python",
+      "args": [
+        "/ABSOLUTE/PATH/TO/n8n-workflow-builder/src/n8n_workflow_builder/server.py"
+      ],
+      "env": {
+        "N8N_API_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+#### Option 4: With .env File (Most Secure)
+```json
+{
+  "mcpServers": {
+    "n8n-workflow-builder": {
+      "command": "/ABSOLUTE/PATH/TO/n8n-workflow-builder/.venv/bin/python",
+      "args": ["-m", "n8n_workflow_builder"],
+      "cwd": "/ABSOLUTE/PATH/TO/n8n-workflow-builder"
+    }
+  }
+}
+```
+With this option, credentials are read from the `.env` file.
+
+**IMPORTANT**:
+- Replace `/ABSOLUTE/PATH/TO/` with your actual path!
+- Windows users: Use `\\` or `/` as path separator
+- Windows Python path: `.venv\Scripts\python.exe` instead of `.venv/bin/python`
 
 ### 5. Claude Desktop neu starten
 Komplett beenden und neu öffnen - dann sollte der MCP Server verfügbar sein! 🎉
