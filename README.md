@@ -79,7 +79,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # n8n API Key holen:
-# 1. Geh zu deiner n8n Instanz: https://n8n.schimmi-n8n.de
+# 1. Geh zu deiner n8n Instanz: https://your-n8n-instance.com
 # 2. Settings > API
 # 3. "Create New API Key"
 # 4. Key kopieren und in .env einfügen
@@ -87,7 +87,7 @@ cp .env.example .env
 
 **Deine .env sollte so aussehen:**
 ```env
-N8N_API_URL=https://n8n.schimmi-n8n.de
+N8N_API_URL=https://your-n8n-instance.com
 N8N_API_KEY=n8n_api_abc123xyz...
 ```
 
@@ -112,7 +112,7 @@ python server.py
         "/ABSOLUTER/PFAD/ZU/n8n-workflow-builder/server.py"
       ],
       "env": {
-        "N8N_API_URL": "https://n8n.schimmi-n8n.de",
+        "N8N_API_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "dein_api_key_hier"
       }
     }
@@ -252,7 +252,7 @@ cat .env
 
 ### "Connection refused"
 - Ist deine n8n Instanz erreichbar?
-- Check: `curl https://n8n.schimmi-n8n.de/healthz`
+- Check: `curl https://your-n8n-instance.com/healthz`
 - Firewall/VPN könnte blockieren
 
 ### Claude Desktop erkennt Server nicht
@@ -316,7 +316,7 @@ WORKFLOW_TEMPLATES["my_template"] = {
 ## 📊 API Reference
 
 Der Server nutzt die offizielle n8n REST API:
-- Basis-URL: `https://n8n.schimmi-n8n.de/api/v1`
+- Basis-URL: `https://your-n8n-instance.com/api/v1`
 - Docs: https://docs.n8n.io/api/
 
 Genutzte Endpoints:

@@ -4,7 +4,7 @@ Get started in 5 minutes! 🚀
 
 ## 1️⃣ Get API Key (2 Min)
 
-1. Go to: https://n8n.schimmi-n8n.de
+1. Go to your n8n instance (e.g., `https://your-n8n-instance.com`)
 2. **Settings** (bottom left) > **API**
 3. Click **"Create New API Key"**
 4. Copy the key (looks like: `n8n_api_...`)
@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 # Create .env file
 cat > .env << EOF
-N8N_API_URL=https://n8n.schimmi-n8n.de
+N8N_API_URL=https://your-n8n-instance.com
 N8N_API_KEY=YOUR_KEY_HERE
 EOF
 ```
@@ -43,7 +43,7 @@ python -m n8n_workflow_builder.server
       "args": ["-m", "n8n_workflow_builder.server"],
       "cwd": "/ABSOLUTE/PATH/TO/n8n-workflow-builder",
       "env": {
-        "N8N_API_URL": "https://n8n.schimmi-n8n.de",
+        "N8N_API_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "YOUR_KEY_HERE"
       }
     }
