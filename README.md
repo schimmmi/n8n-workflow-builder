@@ -15,17 +15,17 @@ Ein **mega-geiler** MCP Server für n8n, der dir hilft, Workflows zu bauen, zu o
 - **Security Checker**: Findet hardcoded Credentials und andere Sicherheitsprobleme
 
 ### 📊 Workflow Management
-- **List & Filter**: Übersicht über alle Workflows mit Status und Infos
-- **Details View**: Detaillierte Infos zu jedem Workflow
-- **Execution Tracking**: Sieh dir vergangene Executions an mit Status und Errors
-- **Workflow Editing**: Bearbeite Workflows - Namen ändern, Nodes anpassen, Settings ändern
-  - ⚠️ Note: `active` und `tags` Felder sind read-only und können nur in der n8n UI geändert werden
+- **List & Filter**: Overview of all workflows with status and info
+- **Details View**: Detailed information about each workflow
+- **Execution Tracking**: View past executions with status and errors
+- **Workflow Editing**: Edit workflows - change names, modify nodes, adjust settings
+  - ⚠️ Note: `active` and `tags` fields are read-only and can only be changed in the n8n UI
 
 ### ⚡ Workflow Execution & Monitoring
-- **Manual Trigger**: Starte Workflows direkt aus Claude (nur für Workflows mit Manual/Webhook Trigger)
-- **Custom Input Data**: Übergebe dynamische Daten an deine Workflows
-- **Execution Details**: Vollständige Node Input/Output Daten für jede Execution abrufen
-- **Execution History**: Liste aller vergangenen Executions mit Status
+- **Manual Trigger**: Start workflows directly from Claude (only for workflows with Manual/Webhook triggers)
+- **Custom Input Data**: Pass dynamic data to your workflows
+- **Execution Details**: Retrieve complete node input/output data for each execution
+- **Execution History**: List of all past executions with status
 
 ### 📚 Knowledge Base
 - **Node Encyclopedia**: Detaillierte Erklärungen zu allen wichtigen n8n Nodes
@@ -240,23 +240,23 @@ Claude nutzt: execute_workflow
 → Workflow wird getriggert, du siehst Execution-Status
 ```
 
-### Workflow bearbeiten
+### Edit Workflow
 ```
-Du: "Benenne Workflow abc-123 um in 'Production Data Sync'"
+You: "Rename workflow abc-123 to 'Production Data Sync'"
 
-Claude nutzt: update_workflow
-→ Workflow wird umbenannt
-```
-
-### Execution Details abrufen
-```
-Du: "Zeig mir Details von Execution 47885"
-
-Claude nutzt: get_execution_details
-→ Zeigt vollständige Node Input/Output Daten, Fehler, Status etc.
+Claude uses: update_workflow
+→ Workflow is renamed
 ```
 
-**Wichtig:** Um Execution-Daten zu sehen, müssen in n8n Settings > Executions folgende Optionen aktiviert sein:
+### Get Execution Details
+```
+You: "Show me details for execution 47885"
+
+Claude uses: get_execution_details
+→ Shows complete node input/output data, errors, status, etc.
+```
+
+**Important:** To see execution data, the following options must be enabled in n8n Settings > Executions:
 - ✅ Save manual executions
 - ✅ Save execution progress
 
