@@ -202,33 +202,50 @@ class N8nClient:
         )
         response.raise_for_status()
         return response.json()
-    
-    async def update_workflow(self, workflow_id: str, workflow: Dict) -> Dict:
-        """Update an existing workflow"""
-        response = await self.client.patch(
-            f"{self.api_url}/api/v1/workflows/{workflow_id}",
-            headers=self.headers,
-            json=workflow
-        )
-        response.raise_for_status()
-        return response.json()
-    
+
     async def execute_workflow(self, workflow_id: str, data: Optional[Dict] = None) -> Dict:
-        """Execute a workflow"""
-        response = await self.client.post(
-            f"{self.api_url}/api/v1/workflows/{workflow_id}/execute",
-            headers=self.headers,
-            json=data or {}
-        )
-        response.raise_for_status()
-        return response.json()
+        """Execute a workflow (test run)
+
+        Note: This triggers a workflow execution similar to the "Execute Workflow" button in the UI.
+        For production workflows, they should be triggered via webhooks or schedule.
+        """
+        # n8n API endpoint for running/testing workflows
+        # The correct endpoint might be /run or /test depending on n8n version
+        try:
+            # Try the /run endpoint first (newer n8n versions)
+            response = await self.client.post(
+                f"{self.api_url}/api/v1/workflows/{workflow_id}/run",
+                headers=self.headers,
+                json=data or {}
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                # Try alternative endpoint /test (older versions)
+                try:
+                    response = await self.client.post(
+                        f"{self.api_url}/api/v1/workflows/{workflow_id}/test",
+                        headers=self.headers,
+                        json=data or {}
+                    )
+                    response.raise_for_status()
+                    return response.json()
+                except httpx.HTTPStatusError:
+                    # If both fail, provide helpful error message
+                    raise Exception(
+                        f"Cannot execute workflow via API. "
+                        f"This workflow might need to be triggered via webhook or schedule, "
+                        f"or use the 'Execute Workflow' button in the n8n UI."
+                    )
+            raise
     
     async def get_executions(self, workflow_id: Optional[str] = None, limit: int = 10) -> List[Dict]:
-        """Get workflow executions"""
+        """Get workflow executions (summary only, without full node data)"""
         params = {"limit": limit}
         if workflow_id:
             params["workflowId"] = workflow_id
-        
+
         response = await self.client.get(
             f"{self.api_url}/api/v1/executions",
             headers=self.headers,
@@ -236,7 +253,97 @@ class N8nClient:
         )
         response.raise_for_status()
         return response.json()["data"]
-    
+
+    async def get_execution(self, execution_id: str, include_data: bool = True) -> Dict:
+        """Get detailed execution data including all node inputs/outputs
+
+        Args:
+            execution_id: The execution ID
+            include_data: Whether to include full execution data (default: True)
+
+        Returns:
+            Full execution data with node data
+        """
+        # Add includeData parameter to get full node execution data
+        params = {}
+        if include_data:
+            params['includeData'] = 'true'
+
+        response = await self.client.get(
+            f"{self.api_url}/api/v1/executions/{execution_id}",
+            headers=self.headers,
+            params=params
+        )
+        response.raise_for_status()
+
+        result = response.json()
+
+        # Log for debugging if data is still missing
+        if not result.get('data', {}).get('resultData'):
+            logger.warning(f"Execution {execution_id} has no resultData - execution data might not be saved by n8n")
+
+        return result
+
+    async def update_workflow(self, workflow_id: str, updates: Dict) -> Dict:
+        """Update an existing workflow
+
+        Args:
+            workflow_id: ID of the workflow to update
+            updates: Dictionary with fields to update (name, active, nodes, connections, settings, etc.)
+
+        Returns:
+            Updated workflow data
+        """
+        # First get the current workflow to merge with updates
+        current_workflow = await self.get_workflow(workflow_id)
+
+        # Whitelist of fields that are allowed by n8n API for updates
+        # Note: 'active', 'tags', 'id', 'createdAt', 'updatedAt' etc. are read-only
+        allowed_fields = ['name', 'nodes', 'connections', 'settings', 'staticData']
+
+        # Build the update payload - start with required fields
+        payload = {
+            'name': current_workflow.get('name', 'Unnamed Workflow'),
+            'nodes': current_workflow.get('nodes', []),
+            'connections': current_workflow.get('connections', {}),
+        }
+
+        # Add optional allowed fields if they exist in current workflow
+        for field in ['settings', 'staticData']:
+            if field in current_workflow:
+                payload[field] = current_workflow[field]
+
+        # Apply updates - only allow whitelisted fields
+        for key, value in updates.items():
+            if key in allowed_fields:
+                payload[key] = value
+            else:
+                logger.warning(f"Skipping field '{key}' - it's read-only or not supported by n8n API")
+
+        # Ensure connections is always present and is a dict
+        if 'connections' not in payload or payload['connections'] is None:
+            payload['connections'] = {}
+
+        # n8n API uses PUT for updates, not PATCH
+        try:
+            response = await self.client.put(
+                f"{self.api_url}/api/v1/workflows/{workflow_id}",
+                headers=self.headers,
+                json=payload
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            # Log the detailed error response for debugging
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
+            logger.error(f"Failed to update workflow {workflow_id}: {error_detail}")
+            logger.error(f"Payload sent: {json.dumps(payload, indent=2)}")
+            raise Exception(f"Failed to update workflow: {error_detail}")
+
     async def close(self):
         """Close HTTP client"""
         await self.client.aclose()
@@ -479,7 +586,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="get_executions",
                 description=(
                     "📊 Get execution history for workflows. "
-                    "View past executions with status, duration, and error info."
+                    "View past executions with status, duration, and error info. "
+                    "Note: This returns summary data only. Use get_execution_details for full node data."
                 ),
                 inputSchema={
                     "type": "object",
@@ -494,6 +602,23 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                             "default": 10
                         }
                     }
+                }
+            ),
+            Tool(
+                name="get_execution_details",
+                description=(
+                    "🔍 Get detailed execution data including all node inputs and outputs. "
+                    "Use this to see what data each node processed during an execution."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "execution_id": {
+                            "type": "string",
+                            "description": "Execution ID to get details for"
+                        }
+                    },
+                    "required": ["execution_id"]
                 }
             ),
             Tool(
@@ -532,6 +657,44 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["error_message"]
+                }
+            ),
+            Tool(
+                name="update_workflow",
+                description=(
+                    "✏️ Update an existing workflow. Modify workflow properties like name, "
+                    "nodes, connections, or settings. Can rename workflows or make structural changes. "
+                    "Note: The 'active' field is read-only and cannot be changed via API - use the n8n UI instead."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "ID of the workflow to update"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Optional: New name for the workflow"
+                        },
+                        "nodes": {
+                            "type": "array",
+                            "description": "Optional: Updated nodes array (full node structure)"
+                        },
+                        "connections": {
+                            "type": "object",
+                            "description": "Optional: Updated connections object"
+                        },
+                        "settings": {
+                            "type": "object",
+                            "description": "Optional: Workflow settings"
+                        },
+                        "tags": {
+                            "type": "array",
+                            "description": "Optional: Workflow tags"
+                        }
+                    },
+                    "required": ["workflow_id"]
                 }
             )
         ]
@@ -656,7 +819,55 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "\n"
                 
                 return [TextContent(type="text", text=result)]
-            
+
+            elif name == "get_execution_details":
+                execution_id = arguments["execution_id"]
+
+                execution = await n8n_client.get_execution(execution_id)
+
+                result = f"# Execution Details: {execution_id}\n\n"
+                result += f"**Workflow:** {execution.get('workflowData', {}).get('name', 'N/A')}\n"
+                result += f"**Status:** {'✅ Finished' if execution.get('finished') else '⏳ Running'}\n"
+                result += f"**Started:** {execution.get('startedAt', 'N/A')}\n"
+
+                if execution.get('stoppedAt'):
+                    result += f"**Stopped:** {execution.get('stoppedAt', 'N/A')}\n"
+
+                if execution.get('mode'):
+                    result += f"**Mode:** {execution.get('mode')}\n"
+
+                # Show node execution data
+                exec_data = execution.get('data', {})
+                result_data = exec_data.get('resultData', {})
+                run_data = result_data.get('runData', {}) if result_data else {}
+
+                if run_data:
+                    result += "\n## Node Results:\n\n"
+                    for node_name, node_runs in run_data.items():
+                        result += f"### {node_name}\n"
+                        for idx, run in enumerate(node_runs):
+                            result += f"**Run {idx + 1}:**\n"
+                            if 'data' in run:
+                                main_data = run['data'].get('main', [[]])[0]
+                                if main_data:
+                                    result += f"- Output items: {len(main_data)}\n"
+                                    # Show first item as sample
+                                    if main_data and len(main_data) > 0:
+                                        first_item = main_data[0]
+                                        result += f"- Sample data: `{json.dumps(first_item.get('json', {}), indent=2)[:500]}...`\n"
+                            if 'error' in run:
+                                result += f"- ❌ Error: {run['error'].get('message', 'Unknown error')}\n"
+                        result += "\n"
+                else:
+                    result += "\n⚠️ **No node execution data available.**\n\n"
+                    result += "This can happen if:\n"
+                    result += "- n8n is configured to not save execution data (check Settings > Executions)\n"
+                    result += "- The execution data has been pruned/deleted\n"
+                    result += "- The workflow hasn't been executed yet\n\n"
+                    result += "To see execution data, ensure 'Save manual executions' and 'Save execution progress' are enabled in n8n settings.\n"
+
+                return [TextContent(type="text", text=result)]
+
             elif name == "explain_node":
                 node_type = arguments["node_type"].lower()
                 
@@ -730,7 +941,52 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     debug_info += "5. Check n8n logs for details\n"
                 
                 return [TextContent(type="text", text=debug_info)]
-            
+
+            elif name == "update_workflow":
+                workflow_id = arguments["workflow_id"]
+
+                # Build updates dictionary from provided arguments
+                updates = {}
+                if "name" in arguments:
+                    updates["name"] = arguments["name"]
+                if "active" in arguments:
+                    updates["active"] = arguments["active"]
+                if "nodes" in arguments:
+                    updates["nodes"] = arguments["nodes"]
+                if "connections" in arguments:
+                    updates["connections"] = arguments["connections"]
+                if "settings" in arguments:
+                    updates["settings"] = arguments["settings"]
+                if "tags" in arguments:
+                    updates["tags"] = arguments["tags"]
+
+                if not updates:
+                    return [TextContent(
+                        type="text",
+                        text="No updates provided. Please specify at least one field to update (name, active, nodes, connections, settings, or tags)."
+                    )]
+
+                # Update the workflow
+                updated_workflow = await n8n_client.update_workflow(workflow_id, updates)
+
+                result = f"# Workflow Updated Successfully\n\n"
+                result += f"**ID:** {updated_workflow.get('id', 'N/A')}\n"
+                result += f"**Name:** {updated_workflow.get('name', 'N/A')}\n"
+                result += f"**Active:** {'✅ Yes' if updated_workflow.get('active') else '❌ No'}\n"
+                result += f"**Nodes:** {len(updated_workflow.get('nodes', []))}\n"
+                result += f"**Updated:** {updated_workflow.get('updatedAt', 'N/A')}\n\n"
+
+                result += "## Changes Applied:\n\n"
+                for key, value in updates.items():
+                    if key in ["nodes", "connections"]:
+                        result += f"- **{key}:** Updated structure\n"
+                    elif key == "active":
+                        result += f"- **{key}:** {'Enabled' if value else 'Disabled'}\n"
+                    else:
+                        result += f"- **{key}:** {value}\n"
+
+                return [TextContent(type="text", text=result)]
+
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
         

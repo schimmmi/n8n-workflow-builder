@@ -18,10 +18,14 @@ Ein **mega-geiler** MCP Server für n8n, der dir hilft, Workflows zu bauen, zu o
 - **List & Filter**: Übersicht über alle Workflows mit Status und Infos
 - **Details View**: Detaillierte Infos zu jedem Workflow
 - **Execution Tracking**: Sieh dir vergangene Executions an mit Status und Errors
+- **Workflow Editing**: Bearbeite Workflows - Namen ändern, Nodes anpassen, Settings ändern
+  - ⚠️ Note: `active` und `tags` Felder sind read-only und können nur in der n8n UI geändert werden
 
-### ⚡ Workflow Execution
-- **Manual Trigger**: Starte Workflows direkt aus Claude
+### ⚡ Workflow Execution & Monitoring
+- **Manual Trigger**: Starte Workflows direkt aus Claude (nur für Workflows mit Manual/Webhook Trigger)
 - **Custom Input Data**: Übergebe dynamische Daten an deine Workflows
+- **Execution Details**: Vollständige Node Input/Output Daten für jede Execution abrufen
+- **Execution History**: Liste aller vergangenen Executions mit Status
 
 ### 📚 Knowledge Base
 - **Node Encyclopedia**: Detaillierte Erklärungen zu allen wichtigen n8n Nodes
@@ -235,6 +239,26 @@ Du: "Führe Workflow 'Test API' mit Input {userId: 123} aus"
 Claude nutzt: execute_workflow
 → Workflow wird getriggert, du siehst Execution-Status
 ```
+
+### Workflow bearbeiten
+```
+Du: "Benenne Workflow abc-123 um in 'Production Data Sync'"
+
+Claude nutzt: update_workflow
+→ Workflow wird umbenannt
+```
+
+### Execution Details abrufen
+```
+Du: "Zeig mir Details von Execution 47885"
+
+Claude nutzt: get_execution_details
+→ Zeigt vollständige Node Input/Output Daten, Fehler, Status etc.
+```
+
+**Wichtig:** Um Execution-Daten zu sehen, müssen in n8n Settings > Executions folgende Optionen aktiviert sein:
+- ✅ Save manual executions
+- ✅ Save execution progress
 
 ## 🧠 Knowledge Base
 
