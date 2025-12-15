@@ -1,18 +1,18 @@
 # 🚀 n8n Workflow Builder MCP Server
 
-Ein **mega-geiler** MCP Server für n8n, der dir hilft, Workflows zu bauen, zu optimieren und zu debuggen - direkt aus Claude heraus! 🎯
+An **awesome** MCP server for n8n that helps you build, optimize, and debug workflows - directly from Claude! 🎯
 
 ## 🌟 Features
 
 ### 🧠 AI-Powered Workflow Design
-- **Smart Node Suggestions**: Beschreib einfach, was du bauen willst, und der Server schlägt die perfekten Nodes vor
-- **Template Generator**: Generiert komplette Workflow-Strukturen aus natürlicher Sprache
-- **Best Practices**: Kennt die n8n Best Practices und warnt dich vor typischen Fehlern
+- **Smart Node Suggestions**: Simply describe what you want to build, and the server suggests the perfect nodes
+- **Template Generator**: Generates complete workflow structures from natural language
+- **Best Practices**: Knows n8n best practices and warns you about common mistakes
 
 ### 🔍 Workflow Analysis & Debugging
-- **Workflow Analyzer**: Scannt deine Workflows nach Problemen und Optimierungspotential
-- **Error Debugger**: Hilft dir, Workflow-Fehler zu verstehen und zu fixen
-- **Security Checker**: Findet hardcoded Credentials und andere Sicherheitsprobleme
+- **Workflow Analyzer**: Scans your workflows for issues and optimization potential
+- **Error Debugger**: Helps you understand and fix workflow errors
+- **Security Checker**: Finds hardcoded credentials and other security problems
 
 ### 📊 Workflow Management
 - **List & Filter**: Overview of all workflows with status and info
@@ -28,78 +28,78 @@ Ein **mega-geiler** MCP Server für n8n, der dir hilft, Workflows zu bauen, zu o
 - **Execution History**: List of all past executions with status
 
 ### 📚 Knowledge Base
-- **Node Encyclopedia**: Detaillierte Erklärungen zu allen wichtigen n8n Nodes
-- **Use Cases & Examples**: Praktische Beispiele für jeden Node-Typ
-- **Configuration Tips**: Wie man jeden Node optimal konfiguriert
+- **Node Encyclopedia**: Detailed explanations of all important n8n nodes
+- **Use Cases & Examples**: Practical examples for each node type
+- **Configuration Tips**: How to optimally configure each node
 
 ## 🎯 Use Cases
 
-### 1. Workflow-Idee zu fertiger Struktur
+### 1. From Workflow Idea to Finished Structure
 ```
-Du: "Ich brauche einen Workflow, der täglich um 9 Uhr Daten aus unserer Postgres-DB holt, 
-     Metriken berechnet und dann einen Report per Slack verschickt"
+You: "I need a workflow that fetches data from our Postgres DB daily at 9am,
+     calculates metrics, and sends a report via Slack"
 
-Claude + MCP: Generiert komplette Workflow-Struktur mit:
-- Schedule Trigger (täglich 9 Uhr)
-- Postgres Node (mit Query-Beispiel)
-- Function Node (Metrik-Berechnung)
-- Set Node (Report-Formatierung)
-- Slack Node (mit Best Practices)
-```
-
-### 2. Workflow-Debugging
-```
-Du: "Mein Workflow wirft 'timeout exceeded' Fehler"
-
-Claude + MCP: Analysiert und schlägt vor:
-- Timeout-Settings erhöhen
-- Retry-Logic hinzufügen
-- Daten in Batches verarbeiten
-- Externe Service-Performance prüfen
+Claude + MCP: Generates complete workflow structure with:
+- Schedule Trigger (daily at 9am)
+- Postgres Node (with query example)
+- Function Node (metric calculation)
+- Set Node (report formatting)
+- Slack Node (with best practices)
 ```
 
-### 3. Workflow-Optimierung
+### 2. Workflow Debugging
 ```
-Du: "Analysiere meinen Workflow 'Daily Report Generator'"
+You: "My workflow throws 'timeout exceeded' errors"
 
-Claude + MCP: Findet:
+Claude + MCP: Analyzes and suggests:
+- Increase timeout settings
+- Add retry logic
+- Process data in batches
+- Check external service performance
+```
+
+### 3. Workflow Optimization
+```
+You: "Analyze my workflow 'Daily Report Generator'"
+
+Claude + MCP: Finds:
 - 3 hardcoded API Keys (Security Issue!)
-- Workflow könnte in 2 Sub-Workflows aufgeteilt werden
-- Error Handling fehlt
-- Node "HTTP Request" sollte umbenannt werden
+- Workflow could be split into 2 sub-workflows
+- Missing error handling
+- Node "HTTP Request" should be renamed
 ```
 
 ## 📦 Installation
 
-### 1. Dependencies installieren
+### 1. Install Dependencies
 ```bash
 cd n8n-workflow-builder
 pip install -r requirements.txt
 ```
 
-### 2. Konfiguration
+### 2. Configuration
 ```bash
-# .env Datei erstellen
+# Create .env file
 cp .env.example .env
 
-# n8n API Key holen:
-# 1. Geh zu deiner n8n Instanz: https://your-n8n-instance.com
+# Get n8n API Key:
+# 1. Go to your n8n instance: https://your-n8n-instance.com
 # 2. Settings > API
 # 3. "Create New API Key"
-# 4. Key kopieren und in .env einfügen
+# 4. Copy key and paste into .env
 ```
 
-**Deine .env sollte so aussehen:**
+**Your .env should look like this:**
 ```env
 N8N_API_URL=https://your-n8n-instance.com
 N8N_API_KEY=n8n_api_abc123xyz...
 ```
 
-### 3. Server testen
+### 3. Test Server
 ```bash
 # Quick Test
 python server.py
-# Sollte keine Errors werfen - wenn ja, check deine .env!
+# Should not throw errors - if it does, check your .env!
 ```
 
 ### 4. Claude Desktop Integration
@@ -179,65 +179,65 @@ With this option, credentials are read from the `.env` file.
 - Windows users: Use `\\` or `/` as path separator
 - Windows Python path: `.venv\Scripts\python.exe` instead of `.venv/bin/python`
 
-### 5. Claude Desktop neu starten
-Komplett beenden und neu öffnen - dann sollte der MCP Server verfügbar sein! 🎉
+### 5. Restart Claude Desktop
+Completely quit and reopen - then the MCP server should be available! 🎉
 
 ## 🎮 Usage Examples
 
-### Node-Vorschläge bekommen
+### Get Node Suggestions
 ```
-Du: "Schlag mir Nodes vor für: API Endpoint der Daten validiert und in eine Datenbank schreibt"
+You: "Suggest nodes for: API endpoint that validates data and writes to a database"
 
-Claude nutzt: suggest_workflow_nodes
-→ Bekommst Vorschläge für Webhook, IF, HTTP Request, Postgres, etc.
-```
-
-### Kompletten Workflow generieren
-```
-Du: "Generiere mir einen Workflow für tägliche Sales Reports aus Postgres nach Slack"
-
-Claude nutzt: generate_workflow_template
-→ Bekommst komplette Struktur mit allen Nodes, Connections und Config-Tips
+Claude uses: suggest_workflow_nodes
+→ You get suggestions for Webhook, IF, HTTP Request, Postgres, etc.
 ```
 
-### Workflow analysieren
+### Generate Complete Workflow
 ```
-Du: "Analysiere meinen Workflow mit ID abc-123"
+You: "Generate a workflow for daily sales reports from Postgres to Slack"
 
-Claude nutzt: analyze_workflow
-→ Findet Issues, Security-Probleme, gibt Optimierungs-Vorschläge
-```
-
-### Node-Details erkunden
-```
-Du: "Erkläre mir den HTTP Request Node"
-
-Claude nutzt: explain_node
-→ Bekommst detaillierte Erklärung, Use Cases, Best Practices, Beispiele
+Claude uses: generate_workflow_template
+→ You get complete structure with all nodes, connections, and config tips
 ```
 
-### Fehler debuggen
+### Analyze Workflow
 ```
-Du: "Mein Workflow wirft: Error 401 Unauthorized"
+You: "Analyze my workflow with ID abc-123"
 
-Claude nutzt: debug_workflow_error
-→ Bekommst Troubleshooting-Steps, wahrscheinliche Ursachen, Lösungen
-```
-
-### Workflows auflisten
-```
-Du: "Zeig mir alle aktiven Workflows"
-
-Claude nutzt: list_workflows
-→ Liste aller Workflows mit Status, Node-Count, Update-Datum
+Claude uses: analyze_workflow
+→ Finds issues, security problems, gives optimization suggestions
 ```
 
-### Workflow ausführen
+### Explore Node Details
 ```
-Du: "Führe Workflow 'Test API' mit Input {userId: 123} aus"
+You: "Explain the HTTP Request node"
 
-Claude nutzt: execute_workflow
-→ Workflow wird getriggert, du siehst Execution-Status
+Claude uses: explain_node
+→ You get detailed explanation, use cases, best practices, examples
+```
+
+### Debug Errors
+```
+You: "My workflow throws: Error 401 Unauthorized"
+
+Claude uses: debug_workflow_error
+→ You get troubleshooting steps, likely causes, solutions
+```
+
+### List Workflows
+```
+You: "Show me all active workflows"
+
+Claude uses: list_workflows
+→ List of all workflows with status, node count, update date
+```
+
+### Execute Workflow
+```
+You: "Execute workflow 'Test API' with input {userId: 123}"
+
+Claude uses: execute_workflow
+→ Workflow is triggered, you see execution status
 ```
 
 ### Edit Workflow
@@ -262,12 +262,12 @@ Claude uses: get_execution_details
 
 ## 🧠 Knowledge Base
 
-Der Server kennt diese Node-Kategorien:
+The server knows these node categories:
 
 ### Triggers
-- **Webhook**: API Endpoints, externe Integrations
-- **Schedule**: Cron-Jobs, periodische Tasks
-- **Manual**: Testing, manuelle Interventions
+- **Webhook**: API endpoints, external integrations
+- **Schedule**: Cron jobs, periodic tasks
+- **Manual**: Testing, manual interventions
 
 ### Logic Nodes
 - **IF**: Conditional branching
@@ -281,94 +281,94 @@ Der Server kennt diese Node-Kategorien:
 - **Function**: Complex data processing
 
 ### Storage
-- **Postgres**: Relationale Datenbank
-- **Redis**: Caching, Session Storage
+- **Postgres**: Relational database
+- **Redis**: Caching, session storage
 
 ### Integrations
-- **Slack**: Messaging & Notifications
-- **Telegram**: Bot Integration
-- **Gmail**: Email Automation
+- **Slack**: Messaging & notifications
+- **Telegram**: Bot integration
+- **Gmail**: Email automation
 
 ## 🛠️ Advanced Features
 
 ### Custom Templates
-Der Server kommt mit vordefinierten Templates:
+The server comes with predefined templates:
 - `api_endpoint`: Simple REST API
-- `scheduled_report`: Daily/Hourly Reports
-- `data_sync`: Database Synchronization
+- `scheduled_report`: Daily/hourly reports
+- `data_sync`: Database synchronization
 
 ### Security Checks
-- Findet hardcoded Credentials
-- Warnt vor fehlender Authentifizierung
-- Checkt auf unsichere Patterns
+- Finds hardcoded credentials
+- Warns about missing authentication
+- Checks for insecure patterns
 
 ### Performance Analysis
-- Workflow-Komplexität berechnen
-- Zu große Workflows erkennen
-- Split-Vorschläge für bessere Wartbarkeit
+- Calculate workflow complexity
+- Detect oversized workflows
+- Suggest splits for better maintainability
 
 ## 🐛 Troubleshooting
 
-### Server startet nicht
+### Server Won't Start
 ```bash
-# Check Python Version (sollte 3.8+)
+# Check Python version (should be 3.8+)
 python --version
 
-# Dependencies neu installieren
+# Reinstall dependencies
 pip install -r requirements.txt --force-reinstall
 
-# .env überprüfen
+# Check .env
 cat .env
-# Sollte N8N_API_URL und N8N_API_KEY enthalten
+# Should contain N8N_API_URL and N8N_API_KEY
 ```
 
 ### "Authentication failed"
-- Check ob dein API Key korrekt ist
-- Geh zu n8n Settings > API und erstelle einen neuen Key
-- Stelle sicher, dass keine Leerzeichen im Key sind
+- Check if your API key is correct
+- Go to n8n Settings > API and create a new key
+- Make sure there are no spaces in the key
 
 ### "Connection refused"
-- Ist deine n8n Instanz erreichbar?
+- Is your n8n instance reachable?
 - Check: `curl https://your-n8n-instance.com/healthz`
-- Firewall/VPN könnte blockieren
+- Firewall/VPN might be blocking
 
-### Claude Desktop erkennt Server nicht
-1. Claude komplett beenden (auch im Hintergrund!)
-2. Config-Datei überprüfen (gültiges JSON?)
-3. Pfade absolut (nicht relativ!)
-4. Claude neu starten
-5. Schaue in Claude: Settings > Developer > MCP Servers
+### Claude Desktop Doesn't Recognize Server
+1. Completely quit Claude (also in background!)
+2. Check config file (valid JSON?)
+3. Paths absolute (not relative!)
+4. Restart Claude
+5. Check in Claude: Settings > Developer > MCP Servers
 
 ## 💡 Pro Tips
 
-### 1. Workflow-Naming
-- Benenn Nodes **immer** um! "HTTP Request 1" ist schlecht, "Fetch User Data" ist gut
-- Nutze Präfixe für Kategorien: "[API] Get Users", "[DB] Insert Record"
+### 1. Workflow Naming
+- **Always** rename nodes! "HTTP Request 1" is bad, "Fetch User Data" is good
+- Use prefixes for categories: "[API] Get Users", "[DB] Insert Record"
 
 ### 2. Error Handling
-- **Immer** Error Handling einbauen bei kritischen Workflows
-- Nutze "Error Trigger" Node für globales Error Handling
-- Logge Errors in Slack/Telegram für Monitoring
+- **Always** add error handling for critical workflows
+- Use "Error Trigger" node for global error handling
+- Log errors in Slack/Telegram for monitoring
 
 ### 3. Testing
-- Entwickle immer mit "Manual Trigger" statt direktem Webhook
-- Nutze "Pinned Data" für konsistente Tests
+- Always develop with "Manual Trigger" instead of direct webhook
+- Use "Pinned Data" for consistent tests
 - Split production/development workflows
 
 ### 4. Performance
-- Batche API Calls wo möglich
-- Nutze Redis für Caching
-- Vermeide zu viele sequentielle HTTP Requests
+- Batch API calls where possible
+- Use Redis for caching
+- Avoid too many sequential HTTP requests
 
 ### 5. Security
-- **NIE** API Keys hardcoden - immer Credentials verwenden
-- Webhook Authentication aktivieren
-- Sensitive Daten nur verschlüsselt speichern
+- **NEVER** hardcode API keys - always use credentials
+- Enable webhook authentication
+- Only store sensitive data encrypted
 
-## 🔄 Updates & Erweiterungen
+## 🔄 Updates & Extensions
 
-### Eigene Nodes zur Knowledge Base hinzufügen
-Edit `server.py` und erweitere `NODE_KNOWLEDGE`:
+### Add Custom Nodes to Knowledge Base
+Edit `server.py` and extend `NODE_KNOWLEDGE`:
 
 ```python
 NODE_KNOWLEDGE["integrations"]["notion"] = {
@@ -379,7 +379,7 @@ NODE_KNOWLEDGE["integrations"]["notion"] = {
 }
 ```
 
-### Eigene Templates erstellen
+### Create Custom Templates
 Edit `WORKFLOW_TEMPLATES` in `server.py`:
 
 ```python
@@ -392,25 +392,26 @@ WORKFLOW_TEMPLATES["my_template"] = {
 
 ## 📊 API Reference
 
-Der Server nutzt die offizielle n8n REST API:
-- Basis-URL: `https://your-n8n-instance.com/api/v1`
+The server uses the official n8n REST API:
+- Base URL: `https://your-n8n-instance.com/api/v1`
 - Docs: https://docs.n8n.io/api/
 
-Genutzte Endpoints:
+Used endpoints:
 - `GET /workflows` - List workflows
 - `GET /workflows/{id}` - Get workflow details
 - `POST /workflows` - Create workflow
-- `PATCH /workflows/{id}` - Update workflow
-- `POST /workflows/{id}/execute` - Execute workflow
+- `PUT /workflows/{id}` - Update workflow
+- `POST /workflows/{id}/run` - Execute workflow
 - `GET /executions` - Get execution history
+- `GET /executions/{id}` - Get execution details
 
 ## 🤝 Contributing
 
-Ideen? Issues? PRs welcome! 🎉
+Ideas? Issues? PRs welcome! 🎉
 
 ## 📝 License
 
-MIT - Do whatever you want! 
+MIT - Do whatever you want!
 
 ## 🙏 Credits
 
@@ -422,4 +423,4 @@ MIT - Do whatever you want!
 
 **Happy Automating!** 🎊
 
-Bei Fragen oder Problemen: Einfach Claude fragen! 😉
+For questions or problems: Just ask Claude! 😉
