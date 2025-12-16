@@ -55,6 +55,15 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Use Cases & Examples**: Practical examples for each node type
 - **Configuration Tips**: How to optimally configure each node
 
+### 🎯 Template Library & AI Recommendations (NEW!)
+- **10+ Pre-Built Templates**: Ready-to-use workflow templates for common use cases
+- **AI-Powered Recommendations**: Get intelligent template suggestions based on your description
+- **Smart Relevance Scoring**: Advanced algorithm matches templates to your requirements (70-90% accuracy)
+- **Category Browse**: Templates organized by category (API, Reporting, Integration, etc.)
+- **Difficulty Levels**: Beginner, Intermediate, and Advanced templates
+- **Full-Text Search**: Search across names, descriptions, tags, and use cases
+- **Template Details**: Complete implementation guides with estimated time and node structure
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
@@ -90,6 +99,24 @@ Claude + MCP: Finds:
 - Workflow could be split into 2 sub-workflows
 - Missing error handling
 - Node "HTTP Request" should be renamed
+```
+
+### 4. Smart Template Recommendations (NEW!)
+```
+You: "I need to send notifications to multiple channels when events occur"
+
+Claude + MCP: Recommends:
+1. Multi-Channel Notification System (85% match) - Beginner
+   - Perfect for system alerts and status updates
+   - Sends to Slack, Telegram, and Email simultaneously
+   - Estimated time: 20 minutes
+
+2. Global Error Handler (62% match) - Intermediate
+   - Catches workflow errors and alerts team
+   - Includes logging and notification features
+   - Estimated time: 25 minutes
+
+Use template 'notification_system' to get started!
 ```
 
 ## 📦 Installation
@@ -269,6 +296,47 @@ You: "Rename workflow abc-123 to 'Production Data Sync'"
 
 Claude uses: update_workflow
 → Workflow is renamed
+```
+
+### Get Template Recommendations (NEW!)
+```
+You: "Recommend templates for sending automated email notifications"
+
+Claude uses: recommend_templates
+→ Gets AI-powered recommendations with relevance scores:
+  1. Email Automation & Processing (68% match) - Intermediate
+  2. Multi-Channel Notification System (54% match) - Beginner
+  3. Global Error Handler (42% match) - Intermediate
+```
+
+### Browse Template Library (NEW!)
+```
+You: "Show me all templates for API development"
+
+Claude uses: get_templates_by_category (category: "api")
+→ Lists:
+  - Simple API Endpoint (Beginner)
+  - API Rate Limiter & Queue (Advanced)
+```
+
+### Search Templates (NEW!)
+```
+You: "Find templates about database sync"
+
+Claude uses: search_templates
+→ Finds all templates containing 'database' or 'sync'
+```
+
+### Get Template Details (NEW!)
+```
+You: "Show me details for the notification_system template"
+
+Claude uses: get_template_details
+→ Complete template info:
+  - Node structure
+  - Implementation guide
+  - Estimated time: 20 minutes
+  - Use cases and best practices
 ```
 
 ### Get Execution Details
