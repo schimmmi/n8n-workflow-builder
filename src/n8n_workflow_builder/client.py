@@ -182,7 +182,35 @@ class N8nClient:
         # Apply updates - only allow whitelisted fields
         for key, value in updates.items():
             if key in allowed_fields:
-                payload[key] = value
+                # Smart merge for nodes: update existing nodes by name, add new ones
+                if key == 'nodes' and isinstance(value, list):
+                    existing_nodes = {node.get('name'): node for node in payload.get('nodes', [])}
+                    for update_node in value:
+                        node_name = update_node.get('name')
+                        if node_name and node_name in existing_nodes:
+                            # Merge: update existing node fields
+                            existing_nodes[node_name].update(update_node)
+                        else:
+                            # Add new node
+                            existing_nodes[update_node.get('name')] = update_node
+                    payload['nodes'] = list(existing_nodes.values())
+                # Smart merge for connections: merge connection dicts
+                elif key == 'connections' and isinstance(value, dict):
+                    if 'connections' not in payload:
+                        payload['connections'] = {}
+                    for node_name, node_connections in value.items():
+                        if node_name not in payload['connections']:
+                            payload['connections'][node_name] = node_connections
+                        else:
+                            # Merge connections for this node
+                            for output_type, outputs in node_connections.items():
+                                if output_type not in payload['connections'][node_name]:
+                                    payload['connections'][node_name][output_type] = outputs
+                                else:
+                                    payload['connections'][node_name][output_type] = outputs
+                # For other fields: simple replace
+                else:
+                    payload[key] = value
             else:
                 logger.warning(f"Skipping field '{key}' - it's read-only or not supported by n8n API")
 
