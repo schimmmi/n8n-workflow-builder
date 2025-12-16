@@ -3336,6 +3336,17 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     if template_id in WORKFLOW_TEMPLATES:
                         template_dict = WORKFLOW_TEMPLATES[template_id]
                         from .templates.sources.base import TemplateMetadata
+
+                        # Convert node names to full node objects
+                        full_nodes = []
+                        for node_info in template_dict["nodes"]:
+                            full_nodes.append({
+                                "name": node_info["name"],
+                                "type": node_info["type"],
+                                "position": [0, 0],
+                                "parameters": {}
+                            })
+
                         template = TemplateMetadata(
                             id=template_id,
                             source="n8n_official",
@@ -3345,11 +3356,11 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                             tags=template_dict["tags"],
                             n8n_version=">=1.0",
                             template_version="1.0.0",
-                            nodes=template_dict["nodes"],
+                            nodes=full_nodes,
                             connections={},
                             settings={},
-                            complexity=template_dict["complexity"],
-                            node_count=len(template_dict["nodes"]),
+                            complexity=template_dict.get("complexity", template_dict.get("difficulty", "intermediate")),
+                            node_count=len(full_nodes),
                             estimated_setup_time=template_dict["estimated_time"]
                         )
 

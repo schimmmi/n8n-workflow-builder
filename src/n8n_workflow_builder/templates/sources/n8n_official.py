@@ -140,7 +140,7 @@ class N8nOfficialSource(TemplateSource):
         from ...templates.recommender import WORKFLOW_TEMPLATES
 
         templates = []
-        for template_dict in WORKFLOW_TEMPLATES.values():
+        for template_id, template_dict in WORKFLOW_TEMPLATES.items():
             # Convert node names to full node objects
             full_nodes = []
             for node_info in template_dict["nodes"]:
@@ -163,7 +163,7 @@ class N8nOfficialSource(TemplateSource):
                     break
 
             template = TemplateMetadata(
-                id=template_dict["id"],
+                id=template_id,
                 source=self.source_name,
                 name=template_dict["name"],
                 description=template_dict["description"],
@@ -174,7 +174,7 @@ class N8nOfficialSource(TemplateSource):
                 nodes=full_nodes,
                 connections={},
                 settings={},
-                complexity=template_dict["complexity"],
+                complexity=template_dict.get("complexity", template_dict.get("difficulty", "intermediate")),
                 node_count=len(full_nodes),
                 estimated_setup_time=template_dict["estimated_time"],
                 trigger_type=trigger_type,
