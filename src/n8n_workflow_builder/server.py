@@ -2591,6 +2591,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow
                 workflow = await n8n_client.get_workflow(workflow_id)
+                # Handle if API returns list instead of dict
+                if isinstance(workflow, list):
+                    workflow = workflow[0] if workflow else {}
+
                 all_workflows = await n8n_client.get_workflows()
 
                 # Optional: Fetch semantic analysis and execution history
@@ -2660,6 +2664,9 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow
                 workflow = await n8n_client.get_workflow(workflow_id)
+                # Handle if API returns list instead of dict
+                if isinstance(workflow, list):
+                    workflow = workflow[0] if workflow else {}
 
                 # Trace data flow
                 data_flow = DataFlowTracer.trace_data_flow(workflow)
