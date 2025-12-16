@@ -347,6 +347,23 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 }
             ),
             Tool(
+                name="delete_workflow",
+                description=(
+                    "🗑️ Delete (archive) a workflow. This removes the workflow from n8n. "
+                    "Use with caution as this action may be irreversible depending on n8n configuration."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "ID of the workflow to delete"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
                 name="get_session_state",
                 description=(
                     "🔄 Get current session state and context. "
@@ -1429,6 +1446,28 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         result += f"- **{key}:** {'Enabled' if value else 'Disabled'}\n"
                     else:
                         result += f"- **{key}:** {value}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "delete_workflow":
+                workflow_id = arguments["workflow_id"]
+
+                # Get workflow name before deletion for better feedback
+                try:
+                    workflow = await n8n_client.get_workflow(workflow_id)
+                    workflow_name = workflow.get('name', 'Unknown')
+                except:
+                    workflow_name = "Unknown"
+
+                # Delete the workflow
+                result_data = await n8n_client.delete_workflow(workflow_id)
+
+                state_manager.log_action("delete_workflow", {"workflow_id": workflow_id, "workflow_name": workflow_name})
+
+                result = f"# Workflow Deleted Successfully\n\n"
+                result += f"**ID:** {workflow_id}\n"
+                result += f"**Name:** {workflow_name}\n\n"
+                result += "⚠️ The workflow has been removed from n8n."
 
                 return [TextContent(type="text", text=result)]
 

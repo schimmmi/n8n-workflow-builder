@@ -238,6 +238,31 @@ class N8nClient:
             logger.error(f"Payload sent: {json.dumps(payload, indent=2)}")
             raise Exception(f"Failed to update workflow: {error_detail}")
 
+    async def delete_workflow(self, workflow_id: str) -> Dict:
+        """Delete (archive) a workflow
+
+        Args:
+            workflow_id: ID of the workflow to delete
+
+        Returns:
+            Success message
+        """
+        try:
+            response = await self.client.delete(
+                f"{self.api_url}/api/v1/workflows/{workflow_id}",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return {"success": True, "message": f"Workflow {workflow_id} deleted successfully"}
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
+            logger.error(f"Failed to delete workflow {workflow_id}: {error_detail}")
+            raise Exception(f"Failed to delete workflow: {error_detail}")
+
     async def close(self):
         """Close HTTP client"""
         await self.client.aclose()
