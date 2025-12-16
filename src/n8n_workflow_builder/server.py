@@ -132,7 +132,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="create_workflow",
                 description=(
                     "✨ Create a new workflow in n8n. Provide workflow name, nodes, and connections. "
-                    "This is the primary tool for building new workflows."
+                    "This is the primary tool for building new workflows. "
+                    "Note: Workflows are created inactive by default and must be activated in the n8n UI."
                 ),
                 inputSchema={
                     "type": "object",
@@ -153,10 +154,6 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         "settings": {
                             "type": "object",
                             "description": "Optional workflow settings"
-                        },
-                        "active": {
-                            "type": "boolean",
-                            "description": "Whether to activate the workflow immediately (default: false)"
                         }
                     },
                     "required": ["name", "nodes", "connections"]
@@ -941,14 +938,13 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 nodes = arguments["nodes"]
                 connections = arguments["connections"]
                 settings = arguments.get("settings", {})
-                active = arguments.get("active", False)
 
                 # Build workflow object
+                # Note: 'active' is read-only and cannot be set during creation
                 workflow_data = {
                     "name": name_arg,
                     "nodes": nodes,
                     "connections": connections,
-                    "active": active,
                     "settings": settings
                 }
 
@@ -965,9 +961,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 })
 
                 # Format result
+                is_active = created_workflow.get("active", False)
                 result = f"# ✅ Workflow Created: {name_arg}\n\n"
                 result += f"**ID**: `{workflow_id}`\n"
-                result += f"**Status**: {'🟢 Active' if active else '⚪ Inactive'}\n"
+                result += f"**Status**: {'🟢 Active' if is_active else '⚪ Inactive (default)'}\n"
                 result += f"**Nodes**: {len(nodes)}\n"
                 result += f"**Connections**: {len(connections)} source nodes\n\n"
 
@@ -979,8 +976,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 result += f"💡 **Next Steps**:\n"
                 result += f"- Execute with: `execute_workflow(workflow_id=\"{workflow_id}\")`\n"
                 result += f"- Monitor with: `watch_workflow_execution(workflow_id=\"{workflow_id}\")`\n"
-                if not active:
-                    result += f"- Activate with: `update_workflow(workflow_id=\"{workflow_id}\", active=true)`\n"
+                if not is_active:
+                    result += f"- Activate in n8n UI if needed (workflows are inactive by default)\n"
 
                 return [TextContent(type="text", text=result)]
 
