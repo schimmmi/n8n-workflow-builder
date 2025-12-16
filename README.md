@@ -74,6 +74,35 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Full-Text Search**: Search across names, descriptions, tags, and use cases
 - **Template Details**: Complete implementation guides with estimated time and node structure
 
+### 💭 Intent Metadata & AI Context (NEW!)
+- **"Why" Documentation**: Attach reasoning, assumptions, and risks to each node
+- **AI Context Continuity**: LLMs remember why nodes exist across iterations
+- **5 Intent Fields**: reason, assumption, risk, alternative, dependency
+- **Coverage Analysis**: Track which nodes have intent metadata
+- **AI-Generated Suggestions**: Get intent templates for undocumented nodes
+- **Workflow Understanding**: Understand existing workflows faster
+- **Learning Loop**: AI agents learn from past decisions
+
+### 🔄 Execution-Aware Feedback Loop (NEW!)
+- **Real-Time Monitoring**: Watch workflow executions and get instant error feedback
+- **Error Simplification**: Complex n8n errors simplified for AI agents
+- **Context Extraction**: Get full error context (node, input, output, error details)
+- **Pattern Analysis**: Analyze error patterns across multiple executions
+- **Success Rate Tracking**: Monitor workflow reliability over time
+- **Fix Suggestions**: Specific recommendations for fixing failed nodes
+- **LLM-Optimized Output**: Structured feedback designed for AI consumption
+
+### 📊 Drift Detection & Degradation Analysis (NEW!)
+- **Temporal Analysis**: Compare baseline vs current execution patterns
+- **4 Drift Patterns**: Success rate drift, performance drift, new error patterns, error frequency drift
+- **Change Point Detection**: Find exactly when workflows started breaking
+- **Gradual vs Sudden**: Classify changes as gradual degradation or sudden breaks
+- **Root Cause Analysis**: Evidence-based determination of why workflows fail
+- **Confidence Scoring**: 0.0-1.0 confidence for all analysis results
+- **Actionable Fixes**: Error-type specific suggestions with concrete node changes
+- **7 Root Causes**: API rate limits, external dependency failures, data schema changes, credential expiry, resource exhaustion, logic bugs, configuration drift
+- **Testing Recommendations**: Specific testing steps before and after fixes
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
@@ -127,6 +156,60 @@ Claude + MCP: Recommends:
    - Estimated time: 25 minutes
 
 Use template 'notification_system' to get started!
+```
+
+### 5. Drift Detection (NEW!)
+```
+You: "My workflow was working fine last month, but now it keeps failing. What happened?"
+
+Claude + MCP: Analyzes execution history with detect_workflow_drift:
+📊 Drift Detected - Severity: CRITICAL
+
+Metrics Comparison:
+- Success Rate: 95% → 62% (-33%)
+- Avg Duration: 1200ms → 1850ms (+54%)
+
+Detected Patterns:
+🔴 New Error Pattern: "429 Rate Limit Exceeded" (appeared 2 weeks ago)
+⚠️ Performance Drift: Response times doubled gradually over 10 days
+
+Next: Use get_drift_root_cause for detailed analysis
+```
+
+```
+You: "What caused this drift?"
+
+Claude + MCP: Uses get_drift_root_cause:
+Root Cause: api_rate_limit_introduced
+Confidence: 85%
+
+Evidence:
+- Rate limit errors appeared where none existed before
+- Error started exactly 14 days ago
+- Only affects HTTP Request nodes calling external API
+
+Recommended Action:
+Add request throttling or implement exponential backoff
+```
+
+```
+You: "How do I fix it?"
+
+Claude + MCP: Uses get_drift_fix_suggestions:
+🔧 Suggested Fixes:
+
+1. Add delay between requests (Node: Fetch User Data)
+   - Add 'Wait' node with 1-2 second delay
+   - Confidence: 85%
+
+2. Implement retry logic with exponential backoff
+   - Use 'HTTP Request' retry settings: 3 attempts, exponential delay
+   - Confidence: 90%
+
+Testing Recommendations:
+✅ Test with rate-limited API first
+✅ Monitor execution duration after changes
+✅ Verify error rate drops below 5%
 ```
 
 ## 📦 Installation
@@ -300,6 +383,15 @@ Claude uses: execute_workflow
 → Workflow is triggered, you see execution status
 ```
 
+### Create Workflow
+```
+You: "Create a workflow called 'Test API' with a manual trigger and HTTP request node"
+
+Claude uses: create_workflow
+→ Workflow is created with all nodes and connections
+→ Returns workflow ID and next steps
+```
+
 ### Edit Workflow
 ```
 You: "Rename workflow abc-123 to 'Production Data Sync'"
@@ -441,11 +533,61 @@ Claude uses: validate_workflow_json
 → Validates structure before workflow creation
 ```
 
+### Intent Metadata (NEW!)
+```
+You: "Add intent to node 'Process Payment' explaining why it exists"
+
+Claude uses: add_node_intent
+→ Adds reason, assumptions, risks, alternatives to node metadata
+```
+
+```
+You: "Show me all intent metadata for this workflow"
+
+Claude uses: get_workflow_intents
+→ Markdown report showing "why" behind each node
+```
+
+```
+You: "Analyze intent coverage for workflow abc-123"
+
+Claude uses: analyze_intent_coverage
+→ Coverage: 75% (6/8 nodes documented)
+→ Critical nodes missing intent: Payment Gateway, Error Handler
+```
+
+### Execution Monitoring (NEW!)
+```
+You: "Watch the execution of workflow 'API Sync'"
+
+Claude uses: watch_workflow_execution
+→ Real-time status with simplified error messages if failed
+```
+
+```
+You: "Get detailed error context for execution 47885"
+
+Claude uses: get_execution_error_context
+→ Full error context: node, input, output, error details
+→ Simplified error message for AI consumption
+→ Fix suggestions with confidence scores
+```
+
+```
+You: "Analyze error patterns for workflow 'Payment Processing'"
+
+Claude uses: analyze_execution_errors (with workflow_id)
+→ Success rate: 78% (78/100 executions)
+→ Most common errors:
+  1. "Timeout Error" in node "External API" (12 occurrences)
+  2. "401 Unauthorized" in node "Auth Check" (10 occurrences)
+```
+
 ### AI Error Analysis & Feedback
 ```
 You: "My workflow failed with execution 12345, what went wrong?"
 
-Claude uses: analyze_execution_errors
+Claude uses: analyze_execution_errors (with execution_id)
 → AI-friendly error analysis with root cause and fixes
 ```
 
@@ -748,6 +890,43 @@ Used endpoints:
 ## 🤝 Contributing
 
 Ideas? Issues? PRs welcome! 🎉
+
+## 📊 Drift Detection Deep Dive
+
+For detailed information about the drift detection system, see:
+- **[Drift Detection Documentation](releases/v1.10.0.md)** - Complete drift detection guide
+
+**Quick summary:**
+- Temporal comparison: baseline (first 30%) vs current (last 30%) execution periods
+- 4 drift patterns: success rate, performance, new errors, error frequency
+- Change point detection: finds when metrics changed significantly
+- 7 root cause types: rate limits, dependency failures, schema changes, credentials, resource exhaustion, logic bugs, config drift
+- Confidence scoring: 0.0-1.0 for all analysis
+- Actionable fixes: error-type specific with testing recommendations
+
+## 💭 Intent Metadata Deep Dive
+
+For detailed information about the intent metadata system, see:
+- **[Intent Metadata Documentation](releases/v1.8.0.md)** - Complete intent system guide
+
+**Quick summary:**
+- "Why" documentation for each workflow node
+- 5 fields: reason, assumption, risk, alternative, dependency
+- AI context continuity across iterations
+- Coverage analysis and suggestions
+- Stored in node metadata (n8n native field)
+
+## 🔄 Execution Monitoring Deep Dive
+
+For detailed information about execution monitoring, see:
+- **[Execution Monitoring Documentation](releases/v1.9.0.md)** - Complete monitoring guide
+
+**Quick summary:**
+- Real-time execution watching with error detection
+- Error simplification for AI consumption
+- Context extraction (node, input, output, error)
+- Pattern analysis across multiple executions
+- Fix suggestions with confidence scores
 
 ## 📝 License
 

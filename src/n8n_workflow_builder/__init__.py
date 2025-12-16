@@ -1,6 +1,6 @@
 """n8n Workflow Builder MCP Server"""
 
-__version__ = "1.0.0"
+__version__ = "1.10.0"
 
 from .server import create_n8n_server
 from .client import N8nClient
