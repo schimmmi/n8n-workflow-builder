@@ -87,6 +87,21 @@ You: "Show me all my n8n workflows"
 "Explain the HTTP Request node with best practices"
 ```
 
+**Update Workflow (Smart Merge):**
+```
+"Update the 'API Handler' workflow - change the HTTP Request node URL to https://api.example.com"
+```
+
+**Delete Workflow:**
+```
+"Delete the test workflow with ID abc123"
+```
+
+**Template Recommendations:**
+```
+"Recommend templates for building a customer notification system"
+```
+
 ---
 
 ## 💥 Troubleshooting

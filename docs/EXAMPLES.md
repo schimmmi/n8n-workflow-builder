@@ -318,6 +318,165 @@ SET key: "cache:api:users:{{$json.userId}}"
 
 ---
 
+## 🎬 Scenario 6: Smart Workflow Update
+
+### What you want:
+Update a single node in an existing workflow without losing other nodes
+
+### How to do it:
+
+**You ask Claude:**
+```
+"Update the 'API Handler' workflow - change the HTTP Request node URL to https://api.example.com/v2"
+```
+
+**Claude uses:** `update_workflow` (with smart merge)
+
+**What happens:**
+```markdown
+# Smart Merge in Action
+
+Before (v1.13.1 and earlier - BUGGY):
+- Updating one node would OVERWRITE the entire workflow
+- All other nodes would be DELETED
+- Data loss!
+
+After (v1.13.2 and later - FIXED):
+- Only the HTTP Request node is updated
+- All other nodes remain untouched
+- Connections preserved
+- Safe updates!
+
+## The Fix:
+✅ Nodes are merged by name
+✅ Only specified fields are updated
+✅ New nodes can be added
+✅ Existing nodes stay intact
+```
+
+**Result:**
+```
+Workflow Updated Successfully
+ID: abc123
+Name: API Handler
+Nodes: 5 (unchanged)
+
+Changes Applied:
+- nodes: Updated structure (HTTP Request node URL changed)
+```
+
+---
+
+## 🎬 Scenario 7: Delete Test Workflows
+
+### What you want:
+Clean up test workflows from your n8n instance
+
+### How to do it:
+
+**You ask Claude:**
+```
+"List all workflows with '[TEST]' in the name and delete them"
+```
+
+**Claude uses:** `list_workflows` + `delete_workflow`
+
+**What happens:**
+```markdown
+# Found 3 test workflows:
+
+1. [TEST] API Endpoint - ID: abc123
+2. [TEST] Daily Report - ID: def456
+3. [TEST] Data Sync - ID: ghi789
+
+# Deleting workflows...
+
+Workflow Deleted Successfully
+ID: abc123
+Name: [TEST] API Endpoint
+⚠️ The workflow has been removed from n8n.
+
+Workflow Deleted Successfully
+ID: def456
+Name: [TEST] Daily Report
+⚠️ The workflow has been removed from n8n.
+
+Workflow Deleted Successfully
+ID: ghi789
+Name: [TEST] Data Sync
+⚠️ The workflow has been removed from n8n.
+
+✅ All test workflows cleaned up!
+```
+
+**Important Notes:**
+- Deletion may be irreversible depending on n8n config
+- Always backup important workflows first
+- Audit trail is logged in session state
+
+---
+
+## 🎬 Scenario 8: Template Recommendations
+
+### What you want:
+Find the perfect template for your use case
+
+### How to do it:
+
+**You ask Claude:**
+```
+"Recommend templates for building a customer notification system"
+```
+
+**Claude uses:** `recommend_templates` (Intelligent Template System v2.0)
+
+**You get:**
+```markdown
+# Template Recommendations
+
+## 1. Email Campaign Workflow (Score: 0.92)
+**Category:** Marketing
+**Difficulty:** Intermediate
+
+**Why this matches:**
+- Designed for customer notifications
+- Email + Slack + SMS support
+- Personalization features
+- Scheduling capabilities
+
+**Use cases:**
+- Product announcements
+- Order confirmations
+- Promotional campaigns
+
+## 2. Event-Driven Notifications (Score: 0.88)
+**Category:** Automation
+**Difficulty:** Advanced
+
+**Why this matches:**
+- Real-time customer alerts
+- Multiple channels (email, SMS, push)
+- Webhook-triggered
+- Priority queuing
+
+**Use cases:**
+- Order status updates
+- System alerts
+- Transaction confirmations
+
+## 3. Scheduled Report Sender (Score: 0.75)
+**Category:** Reporting
+**Difficulty:** Beginner
+
+**Why this matches:**
+- Regular customer communication
+- Email distribution
+- Data visualization
+- Time-based triggers
+```
+
+---
+
 ## 🎯 Power Combos
 
 ### Combo 1: Create + Analyze workflow
@@ -344,6 +503,26 @@ SET key: "cache:api:users:{{$json.userId}}"
 4. → Implement fix
 5. "Analyze workflow again"
 6. → Confirm fix works
+```
+
+### Combo 4: Template → Customize → Deploy
+```
+1. "Recommend templates for notification system"
+2. → Choose best match
+3. "Update workflow - add SMS node after email"
+4. → Smart merge keeps structure
+5. "Validate workflow before deployment"
+6. → Deploy with confidence
+```
+
+### Combo 5: Cleanup Workflow
+```
+1. "List all workflows"
+2. → Find unused/test workflows
+3. "Delete workflow [TEST] API"
+4. → Clean up workspace
+5. "Show remaining workflows"
+6. → Confirm cleanup
 ```
 
 ---
