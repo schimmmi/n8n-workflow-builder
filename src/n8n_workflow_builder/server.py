@@ -129,6 +129,40 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 }
             ),
             Tool(
+                name="create_workflow",
+                description=(
+                    "✨ Create a new workflow in n8n. Provide workflow name, nodes, and connections. "
+                    "This is the primary tool for building new workflows."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Workflow name"
+                        },
+                        "nodes": {
+                            "type": "array",
+                            "description": "Array of workflow nodes with type, name, parameters, position",
+                            "items": {"type": "object"}
+                        },
+                        "connections": {
+                            "type": "object",
+                            "description": "Workflow connections between nodes"
+                        },
+                        "settings": {
+                            "type": "object",
+                            "description": "Optional workflow settings"
+                        },
+                        "active": {
+                            "type": "boolean",
+                            "description": "Whether to activate the workflow immediately (default: false)"
+                        }
+                    },
+                    "required": ["name", "nodes", "connections"]
+                }
+            ),
+            Tool(
                 name="get_workflow_details",
                 description=(
                     "📄 Get detailed information about a specific workflow including "
@@ -901,7 +935,55 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "✅ Workflow looks good! No major issues found.\n"
 
                 return [TextContent(type="text", text=result)]
-            
+
+            elif name == "create_workflow":
+                name_arg = arguments["name"]
+                nodes = arguments["nodes"]
+                connections = arguments["connections"]
+                settings = arguments.get("settings", {})
+                active = arguments.get("active", False)
+
+                # Build workflow object
+                workflow_data = {
+                    "name": name_arg,
+                    "nodes": nodes,
+                    "connections": connections,
+                    "active": active,
+                    "settings": settings
+                }
+
+                # Create workflow via API
+                created_workflow = await n8n_client.create_workflow(workflow_data)
+
+                # Set as current workflow and log
+                workflow_id = created_workflow["id"]
+                state_manager.set_current_workflow(workflow_id, name_arg)
+                state_manager.log_action("create_workflow", {
+                    "workflow_id": workflow_id,
+                    "workflow_name": name_arg,
+                    "node_count": len(nodes)
+                })
+
+                # Format result
+                result = f"# ✅ Workflow Created: {name_arg}\n\n"
+                result += f"**ID**: `{workflow_id}`\n"
+                result += f"**Status**: {'🟢 Active' if active else '⚪ Inactive'}\n"
+                result += f"**Nodes**: {len(nodes)}\n"
+                result += f"**Connections**: {len(connections)} source nodes\n\n"
+
+                result += "## Nodes:\n\n"
+                for node in nodes:
+                    result += f"- **{node['name']}** (`{node['type']}`)\n"
+
+                result += "\n---\n\n"
+                result += f"💡 **Next Steps**:\n"
+                result += f"- Execute with: `execute_workflow(workflow_id=\"{workflow_id}\")`\n"
+                result += f"- Monitor with: `watch_workflow_execution(workflow_id=\"{workflow_id}\")`\n"
+                if not active:
+                    result += f"- Activate with: `update_workflow(workflow_id=\"{workflow_id}\", active=true)`\n"
+
+                return [TextContent(type="text", text=result)]
+
             elif name == "list_workflows":
                 active_only = arguments.get("active_only", False)
                 workflows = await n8n_client.get_workflows(active_only)
