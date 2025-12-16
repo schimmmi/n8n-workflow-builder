@@ -126,6 +126,16 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Performance Estimation**: Predicts execution time, memory usage, complexity
 - **Recommendations**: Actionable suggestions based on impact analysis
 
+### 🎯 Intelligent Template System v2.0 (NEW!)
+- **Intent-Based Matching**: Describe your goal → get smart template suggestions (not keyword search!)
+- **Multi-Source Adapters**: Official n8n templates, GitHub repos, private repos
+- **Intent Extraction**: Automatically extracts purpose, assumptions, risks, data flow from templates
+- **Trigger-Aware Scoring**: Penalizes wrong trigger types (webhook when you need schedule)
+- **Template Adaptation**: Modernizes 2022 templates → 2025-ready (placeholders, credentials, error handling)
+- **Provenance Tracking**: Trust scores, success rates, usage stats for template reliability
+- **Semantic Understanding**: "AI analysis" matches "machine learning", "telegram" matches "notification"
+- **Transparent Matching**: Shows WHY templates match with detailed explanations
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
