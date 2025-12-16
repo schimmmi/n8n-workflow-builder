@@ -58,7 +58,7 @@ class DryRunSimulator:
         # Semantic analysis
         if semantic_analyzer:
             try:
-                semantic = semantic_analyzer.analyze_workflow_full(new_workflow)
+                semantic = semantic_analyzer.analyze_workflow_semantics(new_workflow)
                 results["semantic_issues"] = semantic.get("issues", [])
 
                 critical_issues = [i for i in results["semantic_issues"] if i.get("severity") == "critical"]

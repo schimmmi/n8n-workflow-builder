@@ -2948,12 +2948,20 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     except Exception as e:
                         logger.warning(f"Could not get execution history: {e}")
 
+                # Fetch intent metadata for documentation coverage
+                intent_metadata = None
+                try:
+                    intent_metadata = intent_metadata_store.get_workflow_intents(workflow_id)
+                except Exception as e:
+                    logger.debug(f"Could not get intent metadata: {e}")
+
                 # Analyze risks
                 risk_analysis = WorkflowExplainer.analyze_risks(
                     workflow,
                     semantic_analysis=semantic_analysis,
                     drift_analysis=drift_analysis,
-                    execution_history=execution_history
+                    execution_history=execution_history,
+                    intent_metadata=intent_metadata
                 )
 
                 # Format result

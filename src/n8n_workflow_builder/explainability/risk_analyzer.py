@@ -27,7 +27,8 @@ class RiskAnalyzer:
         semantic_analysis: Optional[Dict] = None,
         drift_analysis: Optional[Dict] = None,
         execution_history: Optional[List[Dict]] = None,
-        dependency_analysis: Optional[Dict] = None
+        dependency_analysis: Optional[Dict] = None,
+        intent_metadata: Optional[Dict] = None
     ) -> Dict:
         """
         Comprehensive risk analysis
@@ -66,7 +67,7 @@ class RiskAnalyzer:
 
         # Analyze compliance risks
         compliance_risks = RiskAnalyzer._analyze_compliance_risks(
-            workflow, semantic_analysis, dependency_analysis
+            workflow, semantic_analysis, dependency_analysis, intent_metadata
         )
 
         # Calculate overall risk score
@@ -422,7 +423,8 @@ class RiskAnalyzer:
     def _analyze_compliance_risks(
         workflow: Dict,
         semantic_analysis: Optional[Dict],
-        dependency_analysis: Optional[Dict]
+        dependency_analysis: Optional[Dict],
+        intent_metadata: Optional[Dict] = None
     ) -> List[Dict]:
         """Analyze compliance risks (GDPR, audit, documentation)"""
         risks = []
@@ -442,8 +444,16 @@ class RiskAnalyzer:
                 })
 
         # Check for missing documentation (intent metadata)
-        documented_nodes = [n for n in nodes if n.get("notes") or n.get("metadata", {}).get("intent")]
-        doc_coverage = len(documented_nodes) / len(nodes) if nodes else 0
+        # First check if we have intent metadata system data
+        if intent_metadata and "nodes" in intent_metadata:
+            # Count nodes with intent metadata
+            intent_nodes = intent_metadata.get("nodes", {})
+            documented_count = len(intent_nodes)
+            doc_coverage = documented_count / len(nodes) if nodes else 0
+        else:
+            # Fallback to checking node metadata directly
+            documented_nodes = [n for n in nodes if n.get("notes") or n.get("metadata", {}).get("intent")]
+            doc_coverage = len(documented_nodes) / len(nodes) if nodes else 0
 
         if doc_coverage < 0.3:  # Less than 30% documented
             risks.append({

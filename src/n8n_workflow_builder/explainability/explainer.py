@@ -141,6 +141,7 @@ class WorkflowExplainer:
         semantic_analysis: Optional[Dict] = None,
         drift_analysis: Optional[Dict] = None,
         execution_history: Optional[List[Dict]] = None,
+        intent_metadata: Optional[Dict] = None,
     ) -> Dict:
         """Quick risk analysis only"""
         # Need dependency analysis for comprehensive risk assessment
@@ -152,4 +153,5 @@ class WorkflowExplainer:
             drift_analysis=drift_analysis,
             execution_history=execution_history,
             dependency_analysis=dependency_analysis,
+            intent_metadata=intent_metadata,
         )
