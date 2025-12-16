@@ -2153,7 +2153,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     execution = await n8n_client.get_execution(execution_id)
                 else:
                     # Get most recent execution for this workflow
-                    executions = await n8n_client.list_executions(workflow_id, limit=1)
+                    executions = await n8n_client.get_executions(workflow_id, limit=1)
                     if not executions or len(executions) == 0:
                         return [TextContent(
                             type="text",
@@ -2271,7 +2271,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 workflow = await n8n_client.get_workflow(workflow_id)
 
                 # Get recent executions
-                executions = await n8n_client.list_executions(workflow_id, limit=limit)
+                executions = await n8n_client.get_executions(workflow_id, limit=limit)
 
                 if not executions or len(executions) == 0:
                     return [TextContent(
@@ -2360,7 +2360,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow and executions
                 workflow = await n8n_client.get_workflow(workflow_id)
-                executions = await n8n_client.list_executions(workflow_id, limit=100)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
 
                 if not executions or len(executions) < 2:
                     return [TextContent(
@@ -2427,7 +2427,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow and executions
                 workflow = await n8n_client.get_workflow(workflow_id)
-                executions = await n8n_client.list_executions(workflow_id, limit=100)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
 
                 # Get drift analysis first
                 drift_analysis = DriftDetector.analyze_execution_history(executions)
@@ -2472,7 +2472,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow and executions
                 workflow = await n8n_client.get_workflow(workflow_id)
-                executions = await n8n_client.list_executions(workflow_id, limit=100)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
 
                 # Get drift analysis
                 drift_analysis = DriftDetector.analyze_execution_history(executions)
@@ -2509,7 +2509,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 # Fetch workflow and executions
                 workflow = await n8n_client.get_workflow(workflow_id)
-                executions = await n8n_client.list_executions(workflow_id, limit=100)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
 
                 # Get drift analysis and root cause
                 drift_analysis = DriftDetector.analyze_execution_history(executions)
