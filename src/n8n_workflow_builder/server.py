@@ -813,7 +813,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="remove_node_intent",
                 description="🗑️ Remove intent metadata from a node. Use when intent needs to be completely rewritten.",
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"},"node_name":{"type":"string","description":"Node name to remove intent from"}},"required":["workflow_id","node_name"]}
-
+            )
         ]
 
     @server.call_tool()
