@@ -536,6 +536,75 @@ For detailed information about the AI feedback system, see:
 - Workflow improvement suggestions
 - Learning loop for AI agents
 
+## 🔒 RBAC & Multi-Tenant Security Deep Dive
+
+For detailed information about the security system, see:
+- **[RBAC & Security Documentation](docs/RBAC_SECURITY.md)** - Complete enterprise security guide
+
+**Quick summary:**
+- 5 role types (Admin, Developer, Operator, Viewer, Auditor)
+- 20+ granular permissions
+- Multi-tenant isolation (separate workflows per tenant)
+- Approval workflows for critical operations
+- Comprehensive audit logging (SOC2, ISO27001, GDPR ready)
+- Cannot approve own requests (separation of duties)
+
+### RBAC Usage Examples
+
+```
+You: "Show me the RBAC status"
+Claude uses: rbac_get_status
+→ Shows users, roles, tenants, pending approvals, audit log
+
+You: "Add user 'bob' as developer in tenant 'acme-corp'"
+Claude uses: rbac_add_user
+→ Creates user with developer permissions
+
+You: "Check if bob can delete workflows"
+Claude uses: rbac_check_permission
+→ Shows if developer role has workflow.delete permission
+
+You: "Bob wants to delete workflow abc-123, create approval request"
+Claude uses: rbac_create_approval_request
+→ Creates pending request for admin approval
+
+You: "Approve request approval-123 as alice"
+Claude uses: rbac_approve_request
+→ Admin approves, operation can proceed
+
+You: "Show audit log for last 24 hours"
+Claude uses: rbac_get_audit_log
+→ Shows all security events with timestamps
+```
+
+### Enterprise Features
+
+✅ **Role-Based Access Control**
+- 5 built-in roles with predefined permissions
+- Granular permission checks before operations
+- Flexible role assignment per user
+
+✅ **Multi-Tenant Isolation**
+- Complete data segregation between tenants
+- Separate workflows, users, audit logs per tenant
+- Tenant-based access control
+
+✅ **Approval Workflows**
+- 4 critical operations require approval
+- Cannot approve own requests
+- Full audit trail of approval decisions
+
+✅ **Audit Logging**
+- Last 500 security events stored
+- Filter by user, action, timestamp
+- Compliance-ready (SOC2, ISO27001, GDPR)
+
+✅ **Security by Design**
+- Least privilege principle
+- Separation of duties
+- Immutable audit logs
+- No self-approval
+
 ## 🔄 Updates & Extensions
 
 ### Add Custom Nodes to Knowledge Base

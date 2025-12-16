@@ -1112,6 +1112,403 @@ class AIFeedbackAnalyzer:
         return report
 
 
+class RBACManager:
+    """Role-Based Access Control and Multi-Tenant Security Manager"""
+
+    # Role definitions with permissions
+    ROLES = {
+        "admin": {
+            "name": "Administrator",
+            "permissions": [
+                "workflow.create", "workflow.read", "workflow.update", "workflow.delete",
+                "workflow.execute", "workflow.validate", "workflow.analyze",
+                "execution.read", "execution.analyze",
+                "state.read", "state.write", "state.clear",
+                "approval.create", "approval.approve", "approval.reject",
+                "user.manage", "role.manage", "audit.read"
+            ],
+            "description": "Full access to all operations"
+        },
+        "developer": {
+            "name": "Developer",
+            "permissions": [
+                "workflow.create", "workflow.read", "workflow.update",
+                "workflow.execute", "workflow.validate", "workflow.analyze",
+                "execution.read", "execution.analyze",
+                "state.read", "state.write",
+                "approval.create"
+            ],
+            "description": "Can create, modify, and test workflows, but needs approval for critical operations"
+        },
+        "operator": {
+            "name": "Operator",
+            "permissions": [
+                "workflow.read", "workflow.execute",
+                "execution.read",
+                "state.read"
+            ],
+            "description": "Can execute existing workflows and view results"
+        },
+        "viewer": {
+            "name": "Viewer",
+            "permissions": [
+                "workflow.read",
+                "execution.read",
+                "state.read"
+            ],
+            "description": "Read-only access to workflows and executions"
+        },
+        "auditor": {
+            "name": "Auditor",
+            "permissions": [
+                "workflow.read",
+                "execution.read",
+                "audit.read"
+            ],
+            "description": "Can view workflows, executions, and audit logs for compliance"
+        }
+    }
+
+    # Critical operations requiring approval
+    APPROVAL_REQUIRED_OPERATIONS = [
+        "workflow.delete",
+        "workflow.deploy_production",
+        "workflow.modify_active",
+        "state.clear"
+    ]
+
+    def __init__(self, state_file: Path = None):
+        self.state_file = state_file or (Path.home() / ".n8n_rbac_state.json")
+        self.rbac_state = self._load_rbac_state()
+
+    def _load_rbac_state(self) -> Dict:
+        """Load RBAC state from file"""
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not load RBAC state: {e}")
+                return self._default_rbac_state()
+        return self._default_rbac_state()
+
+    def _default_rbac_state(self) -> Dict:
+        """Default RBAC state structure"""
+        return {
+            "users": {
+                "default": {
+                    "username": "default",
+                    "role": "admin",
+                    "tenant_id": "default",
+                    "created_at": datetime.now().isoformat()
+                }
+            },
+            "tenants": {
+                "default": {
+                    "tenant_id": "default",
+                    "name": "Default Tenant",
+                    "workflows": [],
+                    "users": ["default"],
+                    "created_at": datetime.now().isoformat()
+                }
+            },
+            "pending_approvals": [],
+            "audit_log": [],
+            "created_at": datetime.now().isoformat()
+        }
+
+    def _save_rbac_state(self):
+        """Save RBAC state to file"""
+        try:
+            with open(self.state_file, 'w') as f:
+                json.dump(self.rbac_state, f, indent=2)
+        except Exception as e:
+            logger.error(f"Could not save RBAC state: {e}")
+
+    def check_permission(self, username: str, permission: str) -> bool:
+        """Check if user has specific permission"""
+        user = self.rbac_state["users"].get(username)
+        if not user:
+            return False
+
+        role = user.get("role")
+        if role not in self.ROLES:
+            return False
+
+        return permission in self.ROLES[role]["permissions"]
+
+    def require_approval(self, operation: str) -> bool:
+        """Check if operation requires approval"""
+        return operation in self.APPROVAL_REQUIRED_OPERATIONS
+
+    def create_approval_request(self, username: str, operation: str, details: Dict) -> str:
+        """Create approval request for critical operation"""
+        approval_id = f"approval-{datetime.now().timestamp()}"
+        approval = {
+            "id": approval_id,
+            "username": username,
+            "operation": operation,
+            "details": details,
+            "status": "pending",
+            "created_at": datetime.now().isoformat(),
+            "approved_by": None,
+            "approved_at": None
+        }
+
+        self.rbac_state["pending_approvals"].append(approval)
+        self._save_rbac_state()
+
+        self._audit_log(username, "approval_request_created", {
+            "approval_id": approval_id,
+            "operation": operation
+        })
+
+        return approval_id
+
+    def approve_request(self, approval_id: str, approver: str) -> Dict:
+        """Approve a pending request"""
+        approval = self._find_approval(approval_id)
+        if not approval:
+            return {"success": False, "error": "Approval request not found"}
+
+        if approval["status"] != "pending":
+            return {"success": False, "error": f"Approval already {approval['status']}"}
+
+        # Check if approver has approval permission
+        if not self.check_permission(approver, "approval.approve"):
+            return {"success": False, "error": "Insufficient permissions to approve"}
+
+        # Cannot approve own request
+        if approver == approval["username"]:
+            return {"success": False, "error": "Cannot approve your own request"}
+
+        approval["status"] = "approved"
+        approval["approved_by"] = approver
+        approval["approved_at"] = datetime.now().isoformat()
+
+        self._save_rbac_state()
+
+        self._audit_log(approver, "approval_approved", {
+            "approval_id": approval_id,
+            "requested_by": approval["username"],
+            "operation": approval["operation"]
+        })
+
+        return {"success": True, "approval": approval}
+
+    def reject_request(self, approval_id: str, rejector: str, reason: str = None) -> Dict:
+        """Reject a pending request"""
+        approval = self._find_approval(approval_id)
+        if not approval:
+            return {"success": False, "error": "Approval request not found"}
+
+        if approval["status"] != "pending":
+            return {"success": False, "error": f"Approval already {approval['status']}"}
+
+        if not self.check_permission(rejector, "approval.reject"):
+            return {"success": False, "error": "Insufficient permissions to reject"}
+
+        approval["status"] = "rejected"
+        approval["approved_by"] = rejector
+        approval["approved_at"] = datetime.now().isoformat()
+        approval["rejection_reason"] = reason
+
+        self._save_rbac_state()
+
+        self._audit_log(rejector, "approval_rejected", {
+            "approval_id": approval_id,
+            "requested_by": approval["username"],
+            "operation": approval["operation"],
+            "reason": reason
+        })
+
+        return {"success": True, "approval": approval}
+
+    def _find_approval(self, approval_id: str) -> Optional[Dict]:
+        """Find approval request by ID"""
+        for approval in self.rbac_state["pending_approvals"]:
+            if approval["id"] == approval_id:
+                return approval
+        return None
+
+    def get_pending_approvals(self, username: str = None) -> List[Dict]:
+        """Get pending approval requests"""
+        pending = [a for a in self.rbac_state["pending_approvals"] if a["status"] == "pending"]
+
+        if username:
+            # Return requests for this user or requests they can approve
+            can_approve = self.check_permission(username, "approval.approve")
+            if can_approve:
+                return pending
+            else:
+                return [a for a in pending if a["username"] == username]
+
+        return pending
+
+    def add_user(self, username: str, role: str, tenant_id: str = "default") -> Dict:
+        """Add a new user"""
+        if username in self.rbac_state["users"]:
+            return {"success": False, "error": "User already exists"}
+
+        if role not in self.ROLES:
+            return {"success": False, "error": f"Invalid role: {role}"}
+
+        user = {
+            "username": username,
+            "role": role,
+            "tenant_id": tenant_id,
+            "created_at": datetime.now().isoformat()
+        }
+
+        self.rbac_state["users"][username] = user
+
+        # Add user to tenant
+        if tenant_id in self.rbac_state["tenants"]:
+            self.rbac_state["tenants"][tenant_id]["users"].append(username)
+
+        self._save_rbac_state()
+
+        self._audit_log("system", "user_created", {
+            "username": username,
+            "role": role,
+            "tenant_id": tenant_id
+        })
+
+        return {"success": True, "user": user}
+
+    def create_tenant(self, tenant_id: str, name: str) -> Dict:
+        """Create a new tenant"""
+        if tenant_id in self.rbac_state["tenants"]:
+            return {"success": False, "error": "Tenant already exists"}
+
+        tenant = {
+            "tenant_id": tenant_id,
+            "name": name,
+            "workflows": [],
+            "users": [],
+            "created_at": datetime.now().isoformat()
+        }
+
+        self.rbac_state["tenants"][tenant_id] = tenant
+        self._save_rbac_state()
+
+        self._audit_log("system", "tenant_created", {
+            "tenant_id": tenant_id,
+            "name": name
+        })
+
+        return {"success": True, "tenant": tenant}
+
+    def check_tenant_access(self, username: str, workflow_id: str) -> bool:
+        """Check if user has access to workflow based on tenant"""
+        user = self.rbac_state["users"].get(username)
+        if not user:
+            return False
+
+        tenant_id = user["tenant_id"]
+        tenant = self.rbac_state["tenants"].get(tenant_id)
+        if not tenant:
+            return False
+
+        # Admin users can access all workflows
+        if user["role"] == "admin":
+            return True
+
+        # Check if workflow belongs to user's tenant
+        return workflow_id in tenant.get("workflows", [])
+
+    def register_workflow(self, workflow_id: str, tenant_id: str):
+        """Register workflow to tenant"""
+        if tenant_id in self.rbac_state["tenants"]:
+            tenant = self.rbac_state["tenants"][tenant_id]
+            if workflow_id not in tenant["workflows"]:
+                tenant["workflows"].append(workflow_id)
+                self._save_rbac_state()
+
+    def _audit_log(self, username: str, action: str, details: Dict):
+        """Log security-relevant actions"""
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "username": username,
+            "action": action,
+            "details": details
+        }
+
+        self.rbac_state["audit_log"].append(log_entry)
+
+        # Keep last 500 entries
+        self.rbac_state["audit_log"] = self.rbac_state["audit_log"][-500:]
+
+        self._save_rbac_state()
+
+        logger.info(f"AUDIT: {username} - {action} - {details}")
+
+    def get_audit_log(self, limit: int = 50, username: str = None, action: str = None) -> List[Dict]:
+        """Get audit log with filters"""
+        logs = self.rbac_state["audit_log"]
+
+        if username:
+            logs = [l for l in logs if l["username"] == username]
+
+        if action:
+            logs = [l for l in logs if l["action"] == action]
+
+        return logs[-limit:]
+
+    def get_user_info(self, username: str) -> Optional[Dict]:
+        """Get user information"""
+        user = self.rbac_state["users"].get(username)
+        if not user:
+            return None
+
+        role_info = self.ROLES.get(user["role"], {})
+        return {
+            **user,
+            "role_name": role_info.get("name"),
+            "permissions": role_info.get("permissions", []),
+            "role_description": role_info.get("description")
+        }
+
+    def generate_rbac_report(self) -> str:
+        """Generate RBAC status report"""
+        report = "# 🔒 RBAC & Security Status\n\n"
+
+        # Users summary
+        users = self.rbac_state["users"]
+        report += f"## 👥 Users: {len(users)}\n\n"
+        role_counts = {}
+        for user in users.values():
+            role = user["role"]
+            role_counts[role] = role_counts.get(role, 0) + 1
+
+        for role, count in role_counts.items():
+            role_name = self.ROLES.get(role, {}).get("name", role)
+            report += f"- **{role_name}**: {count} users\n"
+
+        # Tenants summary
+        tenants = self.rbac_state["tenants"]
+        report += f"\n## 🏢 Tenants: {len(tenants)}\n\n"
+        for tenant in tenants.values():
+            report += f"- **{tenant['name']}** (`{tenant['tenant_id']}`)\n"
+            report += f"  - Users: {len(tenant['users'])}\n"
+            report += f"  - Workflows: {len(tenant['workflows'])}\n"
+
+        # Pending approvals
+        pending = self.get_pending_approvals()
+        report += f"\n## ⏳ Pending Approvals: {len(pending)}\n\n"
+        if pending:
+            for approval in pending[:5]:
+                report += f"- **{approval['id']}** - {approval['operation']} (by {approval['username']})\n"
+
+        # Recent audit log
+        recent_logs = self.get_audit_log(limit=5)
+        report += f"\n## 📋 Recent Audit Log:\n\n"
+        for log in reversed(recent_logs):
+            report += f"- **{log['timestamp']}** - {log['username']}: {log['action']}\n"
+
+        return report
+
+
 class WorkflowBuilder:
     """AI-powered workflow builder"""
 
@@ -1230,6 +1627,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     workflow_validator = WorkflowValidator()
     ai_feedback_analyzer = AIFeedbackAnalyzer()
     state_manager = StateManager()
+    rbac_manager = RBACManager()
     
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -1618,6 +2016,220 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["execution_id", "workflow_id"]
+                }
+            ),
+            Tool(
+                name="rbac_get_status",
+                description=(
+                    "🔒 Get RBAC and security status report. "
+                    "Shows users, roles, tenants, pending approvals, and recent audit log. "
+                    "Use this to understand the current security configuration."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="rbac_add_user",
+                description=(
+                    "👤 Add a new user with specific role and tenant. "
+                    "Creates a user account with assigned permissions based on role. "
+                    "Roles: admin, developer, operator, viewer, auditor"
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "Username for the new user"
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "Role (admin, developer, operator, viewer, auditor)",
+                            "enum": ["admin", "developer", "operator", "viewer", "auditor"]
+                        },
+                        "tenant_id": {
+                            "type": "string",
+                            "description": "Tenant ID (default: 'default')",
+                            "default": "default"
+                        }
+                    },
+                    "required": ["username", "role"]
+                }
+            ),
+            Tool(
+                name="rbac_get_user_info",
+                description=(
+                    "ℹ️ Get detailed information about a user. "
+                    "Shows username, role, permissions, tenant, and creation date."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "Username to query"
+                        }
+                    },
+                    "required": ["username"]
+                }
+            ),
+            Tool(
+                name="rbac_check_permission",
+                description=(
+                    "✅ Check if a user has a specific permission. "
+                    "Validates whether the user's role grants access to an operation. "
+                    "Examples: workflow.create, workflow.delete, approval.approve"
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "Username to check"
+                        },
+                        "permission": {
+                            "type": "string",
+                            "description": "Permission to check (e.g., 'workflow.create', 'approval.approve')"
+                        }
+                    },
+                    "required": ["username", "permission"]
+                }
+            ),
+            Tool(
+                name="rbac_create_approval_request",
+                description=(
+                    "📝 Create an approval request for a critical operation. "
+                    "Used when developer needs admin approval for operations like workflow.delete. "
+                    "Returns approval_id for tracking."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "Username requesting approval"
+                        },
+                        "operation": {
+                            "type": "string",
+                            "description": "Operation requiring approval (workflow.delete, workflow.deploy_production, etc.)"
+                        },
+                        "details": {
+                            "type": "object",
+                            "description": "Additional details about the operation (workflow_id, reason, etc.)"
+                        }
+                    },
+                    "required": ["username", "operation", "details"]
+                }
+            ),
+            Tool(
+                name="rbac_approve_request",
+                description=(
+                    "✅ Approve a pending approval request. "
+                    "Admin approves a request from developer. Cannot approve own requests."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "approval_id": {
+                            "type": "string",
+                            "description": "Approval request ID to approve"
+                        },
+                        "approver": {
+                            "type": "string",
+                            "description": "Username of approver (must have approval.approve permission)"
+                        }
+                    },
+                    "required": ["approval_id", "approver"]
+                }
+            ),
+            Tool(
+                name="rbac_reject_request",
+                description=(
+                    "❌ Reject a pending approval request. "
+                    "Admin rejects a request with reason. Logged in audit trail."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "approval_id": {
+                            "type": "string",
+                            "description": "Approval request ID to reject"
+                        },
+                        "rejector": {
+                            "type": "string",
+                            "description": "Username of rejector"
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "Reason for rejection"
+                        }
+                    },
+                    "required": ["approval_id", "rejector"]
+                }
+            ),
+            Tool(
+                name="rbac_get_pending_approvals",
+                description=(
+                    "⏳ Get list of pending approval requests. "
+                    "Shows all pending requests, or filtered by username if provided."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "username": {
+                            "type": "string",
+                            "description": "Optional: Filter by username (shows requests by/for this user)"
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="rbac_create_tenant",
+                description=(
+                    "🏢 Create a new tenant for multi-tenant isolation. "
+                    "Each tenant has separate workflows, users, and audit logs."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "tenant_id": {
+                            "type": "string",
+                            "description": "Unique tenant identifier (e.g., 'acme-corp')"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Display name for tenant (e.g., 'ACME Corporation')"
+                        }
+                    },
+                    "required": ["tenant_id", "name"]
+                }
+            ),
+            Tool(
+                name="rbac_get_audit_log",
+                description=(
+                    "📋 Get audit log with optional filters. "
+                    "Shows security-relevant actions (user created, workflow deleted, approvals, etc.). "
+                    "Last 500 events stored, customizable retention."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "number",
+                            "description": "Number of log entries to return (default: 50)",
+                            "default": 50
+                        },
+                        "username": {
+                            "type": "string",
+                            "description": "Optional: Filter by username"
+                        },
+                        "action": {
+                            "type": "string",
+                            "description": "Optional: Filter by action type"
+                        }
+                    }
                 }
             )
         ]
@@ -2205,6 +2817,184 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "## 📋 Recommended Changes:\n\n"
                     for idx, change in enumerate(improvements['recommended_changes'], 1):
                         result += f"{idx}. {change}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_get_status":
+                report = rbac_manager.generate_rbac_report()
+                return [TextContent(type="text", text=report)]
+
+            elif name == "rbac_add_user":
+                username = arguments["username"]
+                role = arguments["role"]
+                tenant_id = arguments.get("tenant_id", "default")
+
+                result_data = rbac_manager.add_user(username, role, tenant_id)
+
+                if not result_data["success"]:
+                    return [TextContent(type="text", text=f"❌ Failed to add user: {result_data['error']}")]
+
+                user = result_data["user"]
+                result = f"✅ User created successfully!\n\n"
+                result += f"**Username:** {user['username']}\n"
+                result += f"**Role:** {role}\n"
+                result += f"**Tenant:** {tenant_id}\n"
+                result += f"**Created:** {user['created_at']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_get_user_info":
+                username = arguments["username"]
+                user_info = rbac_manager.get_user_info(username)
+
+                if not user_info:
+                    return [TextContent(type="text", text=f"❌ User '{username}' not found")]
+
+                result = f"# User Information: {username}\n\n"
+                result += f"**Role:** {user_info['role_name']} ({user_info['role']})\n"
+                result += f"**Tenant:** {user_info['tenant_id']}\n"
+                result += f"**Created:** {user_info['created_at']}\n\n"
+                result += f"## Permissions ({len(user_info['permissions'])}):\n\n"
+                for perm in user_info['permissions']:
+                    result += f"- {perm}\n"
+                result += f"\n**Description:** {user_info['role_description']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_check_permission":
+                username = arguments["username"]
+                permission = arguments["permission"]
+
+                has_permission = rbac_manager.check_permission(username, permission)
+
+                if has_permission:
+                    result = f"✅ User '{username}' HAS permission: `{permission}`"
+                else:
+                    result = f"❌ User '{username}' DOES NOT HAVE permission: `{permission}`"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_create_approval_request":
+                username = arguments["username"]
+                operation = arguments["operation"]
+                details = arguments["details"]
+
+                approval_id = rbac_manager.create_approval_request(username, operation, details)
+
+                result = f"📝 Approval request created!\n\n"
+                result += f"**Approval ID:** `{approval_id}`\n"
+                result += f"**Operation:** {operation}\n"
+                result += f"**Requested by:** {username}\n"
+                result += f"**Status:** Pending\n\n"
+                result += "This request needs approval from an admin before the operation can proceed."
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_approve_request":
+                approval_id = arguments["approval_id"]
+                approver = arguments["approver"]
+
+                result_data = rbac_manager.approve_request(approval_id, approver)
+
+                if not result_data["success"]:
+                    return [TextContent(type="text", text=f"❌ Failed to approve: {result_data['error']}")]
+
+                approval = result_data["approval"]
+                result = f"✅ Approval request APPROVED!\n\n"
+                result += f"**Approval ID:** `{approval['id']}`\n"
+                result += f"**Operation:** {approval['operation']}\n"
+                result += f"**Requested by:** {approval['username']}\n"
+                result += f"**Approved by:** {approver}\n"
+                result += f"**Approved at:** {approval['approved_at']}\n\n"
+                result += "The operation can now proceed."
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_reject_request":
+                approval_id = arguments["approval_id"]
+                rejector = arguments["rejector"]
+                reason = arguments.get("reason", "No reason provided")
+
+                result_data = rbac_manager.reject_request(approval_id, rejector, reason)
+
+                if not result_data["success"]:
+                    return [TextContent(type="text", text=f"❌ Failed to reject: {result_data['error']}")]
+
+                approval = result_data["approval"]
+                result = f"❌ Approval request REJECTED\n\n"
+                result += f"**Approval ID:** `{approval['id']}`\n"
+                result += f"**Operation:** {approval['operation']}\n"
+                result += f"**Requested by:** {approval['username']}\n"
+                result += f"**Rejected by:** {rejector}\n"
+                result += f"**Rejected at:** {approval['approved_at']}\n"
+                result += f"**Reason:** {reason}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_get_pending_approvals":
+                username = arguments.get("username")
+                pending = rbac_manager.get_pending_approvals(username)
+
+                if not pending:
+                    result = "✅ No pending approval requests"
+                    if username:
+                        result += f" for user '{username}'"
+                    return [TextContent(type="text", text=result)]
+
+                result = f"# Pending Approval Requests ({len(pending)})\n\n"
+                for approval in pending:
+                    result += f"## `{approval['id']}`\n\n"
+                    result += f"**Operation:** {approval['operation']}\n"
+                    result += f"**Requested by:** {approval['username']}\n"
+                    result += f"**Created:** {approval['created_at']}\n"
+                    if approval.get('details'):
+                        result += f"**Details:** {json.dumps(approval['details'], indent=2)}\n"
+                    result += "\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_create_tenant":
+                tenant_id = arguments["tenant_id"]
+                name = arguments["name"]
+
+                result_data = rbac_manager.create_tenant(tenant_id, name)
+
+                if not result_data["success"]:
+                    return [TextContent(type="text", text=f"❌ Failed to create tenant: {result_data['error']}")]
+
+                tenant = result_data["tenant"]
+                result = f"✅ Tenant created successfully!\n\n"
+                result += f"**Tenant ID:** `{tenant['tenant_id']}`\n"
+                result += f"**Name:** {tenant['name']}\n"
+                result += f"**Created:** {tenant['created_at']}\n\n"
+                result += "You can now add users to this tenant."
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "rbac_get_audit_log":
+                limit = arguments.get("limit", 50)
+                username = arguments.get("username")
+                action = arguments.get("action")
+
+                logs = rbac_manager.get_audit_log(limit, username, action)
+
+                if not logs:
+                    result = "📋 No audit log entries found"
+                    if username:
+                        result += f" for user '{username}'"
+                    if action:
+                        result += f" with action '{action}'"
+                    return [TextContent(type="text", text=result)]
+
+                result = f"# Audit Log ({len(logs)} entries)\n\n"
+                for log in reversed(logs):
+                    result += f"**{log['timestamp']}**\n"
+                    result += f"- User: `{log['username']}`\n"
+                    result += f"- Action: `{log['action']}`\n"
+                    if log.get('details'):
+                        details_str = ", ".join([f"{k}={v}" for k, v in log['details'].items()])
+                        result += f"- Details: {details_str}\n"
+                    result += "\n"
 
                 return [TextContent(type="text", text=result)]
 
