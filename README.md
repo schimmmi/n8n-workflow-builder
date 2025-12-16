@@ -103,6 +103,17 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **7 Root Causes**: API rate limits, external dependency failures, data schema changes, credential expiry, resource exhaustion, logic bugs, configuration drift
 - **Testing Recommendations**: Specific testing steps before and after fixes
 
+### 📖 Explainability Layer (NEW!)
+- **Comprehensive Documentation**: Automatic, audit-ready workflow documentation
+- **Purpose Analysis**: Explains WHY workflows exist with business domain classification (10 domains)
+- **Data Flow Tracing**: Complete data lineage from sources → transformations → destinations
+- **Dependency Mapping**: Maps internal workflows + 25+ external services (Slack, Stripe, AWS, etc.)
+- **Risk Assessment**: 5 risk categories (data loss, security, performance, availability, compliance)
+- **Mitigation Plans**: Prioritized, actionable recommendations with confidence scores
+- **Multi-Format Export**: Markdown (docs), JSON (APIs), Plain Text (console)
+- **AI-Native**: Designed for LLM consumption with structured, consistent output
+- **Zero Configuration**: Works instantly with any n8n workflow
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
@@ -210,6 +221,83 @@ Testing Recommendations:
 ✅ Test with rate-limited API first
 ✅ Monitor execution duration after changes
 ✅ Verify error rate drops below 5%
+```
+
+### 6. Workflow Explainability (NEW!)
+```
+You: "I need to document the 'Payment Processing' workflow for our SOC 2 audit"
+
+Claude + MCP: Uses explain_workflow with markdown format
+
+# Workflow Explanation: Payment Processing
+
+## Executive Summary
+Purpose: Automatically responds to events for e-commerce operations |
+Business Domain: e-commerce | Type: event_driven |
+Data flows from Webhook → 8 transformations → PostgreSQL, Slack, Email |
+Depends on 4 external services | Risk Level: MEDIUM
+
+## Purpose Analysis
+**Primary Purpose**: Automatically responds to events for e-commerce operations
+**Business Domain**: e-commerce
+**Workflow Type**: event_driven
+**Confidence**: 85%
+
+## Data Flow
+Input Sources: Order Webhook
+Transformations: Validate Order → Calculate Totals → Check Inventory
+Output Destinations: Save Order (PostgreSQL), Notify Team (Slack), Email Customer
+
+## Dependencies
+External Services:
+- PostgreSQL (database)
+- Slack (messaging)
+- SendGrid (email)
+
+⚠️ Single Points of Failure:
+- Database used by 2 nodes
+- High-criticality credential affects 2 nodes
+
+## Risk Assessment
+**Overall Risk Level**: MEDIUM (Score: 4.8/10)
+
+🔴 Data Loss Risks:
+- [HIGH] Database operation without transaction management (Save Order)
+
+🔐 Security Risks:
+- [HIGH] 3 high-criticality credentials in use
+
+⚠️ Performance Risks:
+- [MEDIUM] No rate limiting on external API calls (Check Inventory)
+
+🛠️ Mitigation Plan:
+1. [HIGH] Add error handling and retry logic
+2. [HIGH] Ensure credentials are rotated regularly
+3. [MEDIUM] Add rate limiting to API calls
+
+Perfect for: Audit documentation, onboarding, risk assessment
+```
+
+```
+You: "Which workflows will be affected if api.stripe.com goes down?"
+
+Claude + MCP: Uses map_dependencies for all workflows
+
+Affected Workflows (3):
+1. Payment Processing
+   - Nodes: Process Payment, Refund
+   - Severity: CRITICAL
+
+2. Subscription Manager
+   - Nodes: Create Subscription, Cancel
+   - Severity: HIGH
+
+3. Invoice Generator
+   - Nodes: Get Customer, Create Invoice
+   - Severity: MEDIUM
+
+Total Impact: 3 workflows, 6 nodes affected
+Recommendation: Plan maintenance window and notify stakeholders
 ```
 
 ## 📦 Installation
@@ -619,6 +707,45 @@ Claude uses: get_workflow_improvement_suggestions
 → Node-specific fix recommendations
 ```
 
+### Explainability (NEW!)
+
+```
+You: "Explain the 'Payment Processing' workflow"
+
+Claude uses: explain_workflow
+→ Complete documentation: purpose, data flow, dependencies, risks
+→ Available formats: markdown (default), json, text
+```
+
+```
+You: "What is the purpose of workflow abc-123?"
+
+Claude uses: get_workflow_purpose
+→ Business domain, workflow type, trigger description, expected outcomes
+```
+
+```
+You: "Trace the data flow in this workflow"
+
+Claude uses: trace_data_flow
+→ Input sources, transformations, output destinations, critical paths
+```
+
+```
+You: "Show me all dependencies for this workflow"
+
+Claude uses: map_dependencies
+→ Internal workflows, external services, credentials, single points of failure
+```
+
+```
+You: "Assess the risks in this workflow"
+
+Claude uses: analyze_workflow_risks
+→ 5 risk categories with mitigation plan
+→ Overall risk score and level
+```
+
 ## 🧠 Knowledge Base
 
 The server knows these node categories:
@@ -927,6 +1054,20 @@ For detailed information about execution monitoring, see:
 - Context extraction (node, input, output, error)
 - Pattern analysis across multiple executions
 - Fix suggestions with confidence scores
+
+## 📖 Explainability Layer Deep Dive
+
+For detailed information about the explainability layer, see:
+- **[Explainability Layer Documentation](releases/v1.11.0.md)** - Complete explainability guide
+
+**Quick summary:**
+- Automatic, audit-ready workflow documentation
+- Purpose analysis with business domain classification (10 domains)
+- Complete data flow tracing (sources → transformations → sinks)
+- Dependency mapping (internal workflows + 25+ external services)
+- 5-category risk assessment (data loss, security, performance, availability, compliance)
+- Multi-format export (Markdown/JSON/Plain Text)
+- Zero configuration, works with any workflow
 
 ## 📝 License
 
