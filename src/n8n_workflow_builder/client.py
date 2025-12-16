@@ -46,13 +46,24 @@ class N8nClient:
     
     async def create_workflow(self, workflow: Dict) -> Dict:
         """Create a new workflow"""
-        response = await self.client.post(
-            f"{self.api_url}/api/v1/workflows",
-            headers=self.headers,
-            json=workflow
-        )
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = await self.client.post(
+                f"{self.api_url}/api/v1/workflows",
+                headers=self.headers,
+                json=workflow
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            # Log the detailed error response for debugging
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
+            logger.error(f"Failed to create workflow: {error_detail}")
+            logger.error(f"Payload sent: {json.dumps(workflow, indent=2)}")
+            raise Exception(f"Failed to create workflow: {error_detail}")
 
     async def execute_workflow(self, workflow_id: str, data: Optional[Dict] = None) -> Dict:
         """Execute a workflow (test run)
