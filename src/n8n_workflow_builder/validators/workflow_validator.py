@@ -3,6 +3,7 @@
 Workflow Validator Module
 Validates workflow structure and schema
 """
+import json
 from typing import Dict, List
 
 
