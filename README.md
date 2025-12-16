@@ -14,12 +14,15 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Error Debugger**: Helps you understand and fix workflow errors
 - **Security Checker**: Finds hardcoded credentials and other security problems
 
-### 📊 Workflow Management
+### 📊 Workflow Management (Full CRUD)
 - **List & Filter**: Overview of all workflows with status and info
 - **Details View**: Detailed information about each workflow
 - **Execution Tracking**: View past executions with status and errors
-- **Workflow Editing**: Edit workflows - change names, modify nodes, adjust settings
+- **Workflow Creation**: Create new workflows from scratch or templates
+- **Workflow Editing**: Smart merge updates - change names, modify nodes, adjust settings
+  - ✨ **NEW**: Intelligent node merging prevents accidental data loss (v1.13.2)
   - ⚠️ Note: `active` and `tags` fields are read-only and can only be changed in the n8n UI
+- **Workflow Deletion**: Delete/archive workflows safely (v1.14.0)
 
 ### ⚡ Workflow Execution & Monitoring
 - **Manual Trigger**: Start workflows directly from Claude (only for workflows with Manual/Webhook triggers)
@@ -1224,6 +1227,45 @@ For detailed information about change simulation and approval workflows, see:
 4. `create_change_request` - Create approval request
 5. `review_change_request` - Approve/reject changes
 6. `get_change_history` - View workflow change history
+
+## 🚀 Intelligent Template System v2.0
+
+For detailed information about the template system, see:
+- **[Template System Documentation](releases/v1.13.0.md)** - Complete intelligent template system guide
+
+**Quick summary:**
+- Multi-source template adapters (n8n official, GitHub, local files)
+- AI-powered template recommendations based on intent understanding
+- Semantic matching beyond simple keywords
+- Template quality scoring and ranking
+- Automatic caching and deduplication
+- Zero configuration required
+
+## 📦 Recent Updates
+
+### v1.14.0 - Workflow Deletion (2025-12-16)
+- **[Release Notes](releases/v1.14.0.md)**
+- Added `delete_workflow` tool for safe workflow archiving
+- Complete CRUD operations now available
+- Audit trail logging for deletions
+
+### v1.13.2 - Critical Bugfix (2025-12-16)
+- **[Release Notes](releases/v1.13.2.md)**
+- Fixed critical bug in `update_workflow` that could cause data loss
+- Implemented smart merge logic for nodes and connections
+- Prevents accidental overwriting of entire workflows
+
+### v1.13.1 - Bugfixes (2025-12-16)
+- **[Release Notes](releases/v1.13.1.md)**
+- Fixed intent metadata integration issues
+- Corrected risk analysis intent retrieval
+- Fixed semantic analyzer method names
+
+### v1.13.0 - Intelligent Template System v2.0 (2025-12-16)
+- **[Release Notes](releases/v1.13.0.md)**
+- Multi-source template adapters
+- AI-powered template recommendations
+- Semantic matching and quality scoring
 
 ## 📝 License
 
