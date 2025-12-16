@@ -3,6 +3,7 @@
 Intent Metadata Module
 Manages "why" metadata for workflow nodes to maintain AI context across iterations
 """
+import json
 from typing import Dict, List, Optional
 from datetime import datetime
 
