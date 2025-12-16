@@ -3,6 +3,7 @@
 Semantic Workflow Analyzer Module
 Deep semantic analysis of workflow logic and anti-patterns
 """
+import json
 import re
 from typing import Dict, List, Set
 
