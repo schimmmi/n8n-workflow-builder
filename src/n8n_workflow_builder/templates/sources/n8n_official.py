@@ -141,6 +141,27 @@ class N8nOfficialSource(TemplateSource):
 
         templates = []
         for template_dict in WORKFLOW_TEMPLATES.values():
+            # Convert node names to full node objects
+            full_nodes = []
+            for node_info in template_dict["nodes"]:
+                if isinstance(node_info, dict):
+                    full_nodes.append(node_info)
+                else:
+                    # Node info is dict with name and type
+                    full_nodes.append({
+                        "name": node_info["name"],
+                        "type": node_info["type"],
+                        "position": [0, 0],
+                        "parameters": {}
+                    })
+
+            # Determine trigger type
+            trigger_type = None
+            for node in full_nodes:
+                if "trigger" in node.get("type", "").lower():
+                    trigger_type = node.get("type")
+                    break
+
             template = TemplateMetadata(
                 id=template_dict["id"],
                 source=self.source_name,
@@ -150,12 +171,13 @@ class N8nOfficialSource(TemplateSource):
                 tags=template_dict["tags"],
                 n8n_version=">=1.0",
                 template_version="1.0.0",
-                nodes=template_dict["nodes"],
+                nodes=full_nodes,
                 connections={},
                 settings={},
                 complexity=template_dict["complexity"],
-                node_count=len(template_dict["nodes"]),
+                node_count=len(full_nodes),
                 estimated_setup_time=template_dict["estimated_time"],
+                trigger_type=trigger_type,
                 author="n8n Team",
                 source_url="https://n8n.io/workflows",
                 has_documentation=True
