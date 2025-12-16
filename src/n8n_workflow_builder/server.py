@@ -22,6 +22,12 @@ from .security.rbac import RBACManager
 from .templates.recommender import TemplateRecommendationEngine, WORKFLOW_TEMPLATES
 from .builders.workflow_builder import WorkflowBuilder, NODE_KNOWLEDGE
 from .intent import IntentManager
+from .execution.error_analyzer import (
+    ExecutionMonitor,
+    ErrorContextExtractor,
+    ErrorSimplifier,
+    FeedbackGenerator
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -813,6 +819,21 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="remove_node_intent",
                 description="🗑️ Remove intent metadata from a node. Use when intent needs to be completely rewritten.",
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"},"node_name":{"type":"string","description":"Node name to remove intent from"}},"required":["workflow_id","node_name"]}
+            ),
+            Tool(
+                name="watch_workflow_execution",
+                description="👁️ Monitor workflow execution and get detailed error feedback. Returns execution status with error analysis if execution failed.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to monitor"},"execution_id":{"type":"string","description":"Optional: Specific execution ID. If not provided, analyzes the most recent execution."}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="get_execution_error_context",
+                description="🔍 Get detailed error context for a failed execution. Extracts error node, simplifies error message, provides fix suggestions.",
+                inputSchema={"type":"object","properties":{"execution_id":{"type":"string","description":"Execution ID that failed"},"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["execution_id","workflow_id"]}
+            ),
+            Tool(
+                name="analyze_execution_errors",
+                description="📊 Analyze error patterns across multiple executions of a workflow. Identifies common failure points and recurring issues.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to analyze"},"limit":{"type":"number","description":"Number of recent executions to analyze (default: 10)","default":10}},"required":["workflow_id"]}
             )
         ]
 
@@ -2014,6 +2035,219 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     type="text",
                     text=f"✅ Intent metadata removed from node: **{node_name}**"
                 )]
+
+            elif name == "watch_workflow_execution":
+                workflow_id = arguments["workflow_id"]
+                execution_id = arguments.get("execution_id")
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Get execution - either specific ID or most recent
+                if execution_id:
+                    execution = await n8n_client.get_execution(execution_id)
+                else:
+                    # Get most recent execution for this workflow
+                    executions = await n8n_client.list_executions(workflow_id, limit=1)
+                    if not executions or len(executions) == 0:
+                        return [TextContent(
+                            type="text",
+                            text=f"ℹ️ No executions found for workflow: {workflow['name']}"
+                        )]
+                    execution = executions[0]
+                    execution_id = execution["id"]
+
+                # Analyze execution
+                analysis = ExecutionMonitor.analyze_execution(execution, workflow)
+
+                # Log action
+                state_manager.log_action("watch_workflow_execution", {
+                    "workflow_id": workflow_id,
+                    "execution_id": execution_id,
+                    "has_errors": analysis["has_errors"]
+                })
+
+                # Format result
+                result = f"# Execution Monitor: {analysis['workflow_name']}\n\n"
+                result += f"**Execution ID**: `{execution_id}`\n"
+                result += f"**Status**: {'❌ Failed' if analysis['has_errors'] else '✅ Success'}\n"
+                result += f"**Mode**: {analysis['mode']}\n"
+
+                if analysis['started_at']:
+                    result += f"**Started**: {analysis['started_at']}\n"
+                if analysis['stopped_at']:
+                    result += f"**Stopped**: {analysis['stopped_at']}\n"
+                if analysis['duration_ms']:
+                    result += f"**Duration**: {analysis['duration_ms']}ms\n"
+
+                result += "\n"
+
+                if analysis["has_errors"]:
+                    result += "## ❌ Errors Detected\n\n"
+                    for error_node in analysis["error_nodes"]:
+                        node_name = error_node["node_name"]
+                        error = error_node["error"]
+
+                        # Simplify error
+                        simplified = ErrorSimplifier.simplify_error(error)
+
+                        result += f"### Node: {node_name}\n\n"
+                        result += f"**Error Type**: `{simplified['error_type']}`\n"
+                        result += f"**Message**: {simplified['simplified_message']}\n\n"
+
+                    result += f"---\n\n"
+                    result += f"💡 **Tip**: Use `get_execution_error_context` with execution_id `{execution_id}` "
+                    result += f"to get detailed error analysis and fix suggestions.\n"
+                else:
+                    result += "✅ Execution completed successfully with no errors.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_execution_error_context":
+                execution_id = arguments["execution_id"]
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow and execution
+                workflow = await n8n_client.get_workflow(workflow_id)
+                execution = await n8n_client.get_execution(execution_id)
+
+                # Analyze execution to find error nodes
+                analysis = ExecutionMonitor.analyze_execution(execution, workflow)
+
+                if not analysis["has_errors"]:
+                    return [TextContent(
+                        type="text",
+                        text=f"ℹ️ Execution {execution_id} completed successfully - no errors to analyze"
+                    )]
+
+                if not analysis["error_nodes"] or len(analysis["error_nodes"]) == 0:
+                    return [TextContent(
+                        type="text",
+                        text=f"⚠️ Execution failed but no specific error node could be identified"
+                    )]
+
+                # Get first error node (most common case)
+                error_node_info = analysis["error_nodes"][0]
+                error_node_name = error_node_info["node_name"]
+
+                # Extract full error context
+                error_context = ErrorContextExtractor.extract_error_context(
+                    execution, workflow, error_node_name
+                )
+
+                # Simplify error
+                simplified_error = ErrorSimplifier.simplify_error(
+                    error_context["error_details"]
+                )
+
+                # Generate feedback
+                feedback = FeedbackGenerator.generate_feedback(
+                    error_context, simplified_error
+                )
+
+                # Format for LLM
+                result = FeedbackGenerator.format_feedback_for_llm(feedback)
+
+                # Log action
+                state_manager.log_action("get_execution_error_context", {
+                    "execution_id": execution_id,
+                    "workflow_id": workflow_id,
+                    "error_node": error_node_name,
+                    "error_type": simplified_error["error_type"]
+                })
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "analyze_execution_errors":
+                workflow_id = arguments["workflow_id"]
+                limit = arguments.get("limit", 10)
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Get recent executions
+                executions = await n8n_client.list_executions(workflow_id, limit=limit)
+
+                if not executions or len(executions) == 0:
+                    return [TextContent(
+                        type="text",
+                        text=f"ℹ️ No executions found for workflow: {workflow['name']}"
+                    )]
+
+                # Analyze all executions
+                error_patterns = {}
+                failed_count = 0
+                success_count = 0
+
+                for execution in executions:
+                    analysis = ExecutionMonitor.analyze_execution(execution, workflow)
+
+                    if analysis["has_errors"]:
+                        failed_count += 1
+
+                        for error_node in analysis["error_nodes"]:
+                            node_name = error_node["node_name"]
+                            error = error_node["error"]
+                            simplified = ErrorSimplifier.simplify_error(error)
+
+                            # Track error patterns
+                            key = f"{node_name}:{simplified['error_type']}"
+                            if key not in error_patterns:
+                                error_patterns[key] = {
+                                    "node_name": node_name,
+                                    "error_type": simplified['error_type'],
+                                    "message": simplified['simplified_message'],
+                                    "count": 0,
+                                    "execution_ids": []
+                                }
+                            error_patterns[key]["count"] += 1
+                            error_patterns[key]["execution_ids"].append(execution["id"])
+                    else:
+                        success_count += 1
+
+                # Format result
+                result = f"# Execution Error Analysis: {workflow['name']}\n\n"
+                result += f"**Total Executions Analyzed**: {len(executions)}\n"
+                result += f"**Successful**: ✅ {success_count}\n"
+                result += f"**Failed**: ❌ {failed_count}\n"
+                result += f"**Success Rate**: {round(success_count / len(executions) * 100, 1)}%\n\n"
+
+                if error_patterns:
+                    result += "## 🔥 Error Patterns\n\n"
+                    result += "Most common errors across executions:\n\n"
+
+                    # Sort by count
+                    sorted_patterns = sorted(
+                        error_patterns.values(),
+                        key=lambda x: x["count"],
+                        reverse=True
+                    )
+
+                    for pattern in sorted_patterns:
+                        result += f"### {pattern['node_name']}\n\n"
+                        result += f"**Error Type**: `{pattern['error_type']}`\n"
+                        result += f"**Message**: {pattern['message']}\n"
+                        result += f"**Occurrences**: {pattern['count']} times\n"
+                        result += f"**Execution IDs**: {', '.join(pattern['execution_ids'][:3])}"
+                        if len(pattern['execution_ids']) > 3:
+                            result += f" (+{len(pattern['execution_ids']) - 3} more)"
+                        result += "\n\n"
+
+                    result += "---\n\n"
+                    result += "💡 **Recommendation**: Focus on fixing the most frequent errors first. "
+                    result += "Use `get_execution_error_context` for detailed fix suggestions.\n"
+                else:
+                    result += "✅ No error patterns detected - all executions succeeded!\n"
+
+                # Log action
+                state_manager.log_action("analyze_execution_errors", {
+                    "workflow_id": workflow_id,
+                    "executions_analyzed": len(executions),
+                    "failed_count": failed_count,
+                    "error_patterns": len(error_patterns)
+                })
+
+                return [TextContent(type="text", text=result)]
 
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
