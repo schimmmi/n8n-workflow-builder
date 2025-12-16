@@ -71,54 +71,78 @@ class TemplateMatcher:
         query_lower = query.lower()
         score = 0.0
         reasons = []
+        penalties = []
 
-        # 1. Intent/Purpose matching (35% weight) - boosted if high match
+        # 1. Intent/Purpose matching (40% weight)
         intent_score = self._score_text_similarity(
             query_lower,
             [template.intent or "", template.purpose or "", template.description, template.name]
         )
-        # Boost high intent matches
-        if intent_score > 0.3:
-            score += intent_score * 0.45
-            reasons.append(f"Intent matches ({int(intent_score * 100)}%)")
-        else:
-            score += intent_score * 0.35
+        score += intent_score * 0.40
 
-        # 2. Keyword matching (25% weight) - with synonym support
+        if intent_score > 0.2:
+            reasons.append(f"Intent matches ({int(intent_score * 100)}%)")
+
+        # 2. Trigger type matching (30% weight) - CRITICAL for workflow type
+        trigger_score = self._score_trigger_type(query_lower, template)
+
+        # Detect if user specified a trigger type
+        user_wants_schedule = any(word in query_lower for word in ["schedule", "daily", "hourly", "cron", "periodic", "regularly", "automated", "every"])
+        user_wants_webhook = any(word in query_lower for word in ["webhook", "http", "api endpoint", "trigger", "receive"])
+        user_wants_manual = any(word in query_lower for word in ["manual", "on-demand", "button"])
+
+        template_trigger = (template.trigger_type or "").lower()
+        has_schedule = "schedule" in template_trigger or "cron" in template_trigger
+        has_webhook = "webhook" in template_trigger or "http" in template_trigger
+        has_manual = "manual" in template_trigger
+
+        # Apply trigger matching/penalty
+        if user_wants_schedule:
+            if has_schedule:
+                score += 0.30  # Perfect match bonus
+                reasons.append(f"✅ Trigger: schedule (matches query)")
+            else:
+                score += 0.05  # Heavy penalty for wrong trigger
+                penalties.append("⚠️ Wrong trigger (has {}, need schedule)".format(template_trigger or "none"))
+        elif user_wants_webhook:
+            if has_webhook:
+                score += 0.30
+                reasons.append(f"✅ Trigger: webhook (matches query)")
+            else:
+                score += 0.05
+                penalties.append("⚠️ Wrong trigger (has {}, need webhook)".format(template_trigger or "none"))
+        elif user_wants_manual:
+            if has_manual:
+                score += 0.30
+                reasons.append(f"✅ Trigger: manual (matches query)")
+            else:
+                score += 0.05
+                penalties.append("⚠️ Wrong trigger (has {}, need manual)".format(template_trigger or "none"))
+        else:
+            # No specific trigger mentioned - use normal scoring
+            score += trigger_score * 0.30
+            if trigger_score > 0.5:
+                reasons.append(f"Trigger: {template.trigger_type}")
+
+        # 3. Keyword matching (20% weight) - reduced from 25%
         keyword_score = self._score_keywords(query_lower, template)
-        score += keyword_score * 0.25
+        score += keyword_score * 0.20
 
         if keyword_score > 0.3:
             reasons.append(f"Keywords match ({int(keyword_score * 100)}%)")
 
-        # 3. External systems matching (25% weight) - critical for integration
+        # 4. External systems matching (10% weight) - reduced from 25%
         systems_score = self._score_external_systems(query_lower, template)
-        score += systems_score * 0.25
+        score += systems_score * 0.10
 
         if systems_score > 0.3:
             matched_systems = [s for s in template.external_systems or [] if s.lower() in query_lower]
             if matched_systems:
                 reasons.append(f"Uses: {', '.join(matched_systems[:3])}")
 
-        # 4. Trigger type matching (15% weight) - important for scheduling
-        trigger_score = self._score_trigger_type(query_lower, template)
-        score += trigger_score * 0.15
-
-        if trigger_score > 0.5:
-            reasons.append(f"Trigger: {template.trigger_type}")
-
-        # 5. BOOST: Direct word matches in query (bonus points)
-        query_words = set(self._tokenize(query_lower))
-        template_words = set(self._tokenize(f"{template.name} {template.description}"))
-        direct_matches = query_words & template_words
-        if direct_matches:
-            boost = min(len(direct_matches) * 0.05, 0.2)  # Max 20% boost
-            score += boost
-            if boost > 0.1:
-                reasons.append(f"{len(direct_matches)} direct word matches")
-
         # Build reason string
-        reason_str = " | ".join(reasons) if reasons else "General match"
+        all_feedback = reasons + penalties
+        reason_str = " | ".join(all_feedback) if all_feedback else "General match"
 
         return min(score, 1.0), reason_str
 
