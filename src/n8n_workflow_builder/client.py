@@ -34,7 +34,11 @@ class N8nClient:
         )
         response.raise_for_status()
         return response.json()["data"]
-    
+
+    async def list_workflows(self, active_only: bool = False) -> List[Dict]:
+        """Alias for get_workflows - used by change simulation"""
+        return await self.get_workflows(active_only)
+
     async def get_workflow(self, workflow_id: str) -> Dict:
         """Get a specific workflow"""
         response = await self.client.get(
