@@ -2842,8 +2842,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
         
         except Exception as e:
+            import traceback
             logger.error(f"Error in tool {name}: {e}")
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return [TextContent(type="text", text=f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}")]
     
 
     return server
