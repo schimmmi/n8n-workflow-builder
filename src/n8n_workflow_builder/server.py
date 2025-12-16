@@ -2951,7 +2951,9 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 # Fetch intent metadata for documentation coverage
                 intent_metadata = None
                 try:
-                    intent_metadata = intent_metadata_store.get_workflow_intents(workflow_id)
+                    workflow_intents = intent_manager.get_workflow_intents(workflow)
+                    if workflow_intents:
+                        intent_metadata = {"nodes": workflow_intents}
                 except Exception as e:
                     logger.debug(f"Could not get intent metadata: {e}")
 
