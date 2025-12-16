@@ -42,6 +42,13 @@ from .explainability import (
     RiskAnalyzer,
     ExplainabilityFormatter
 )
+from .changes import (
+    WorkflowDiffEngine,
+    ChangeImpactAnalyzer,
+    DryRunSimulator,
+    ApprovalWorkflow,
+    ChangeFormatter
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +68,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     rbac_manager = RBACManager()
     template_engine = TemplateRecommendationEngine()
     intent_manager = IntentManager()
+    approval_workflow = ApprovalWorkflow()
     
 
     @server.list_tools()
@@ -924,6 +932,83 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="analyze_workflow_risks",
                 description="⚠️ Comprehensive risk assessment: data loss, security, performance, availability, compliance risks with mitigation plan.",
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"},"include_analysis":{"type":"boolean","description":"Include semantic analysis and execution history (default: true)","default":True}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="simulate_workflow_changes",
+                description="🔮 Terraform-style change preview: compare old vs new workflow, analyze impact, detect breaking changes. Shows color-coded diff with recommendations.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "workflow_id":{"type":"string","description":"Current workflow ID"},
+                        "new_workflow":{"type":"object","description":"New workflow JSON structure"}
+                    },
+                    "required":["workflow_id","new_workflow"]
+                }
+            ),
+            Tool(
+                name="compare_workflows",
+                description="📊 Side-by-side workflow comparison: detailed diff of nodes, connections, settings. Identifies added/removed/modified elements.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "workflow_id_1":{"type":"string","description":"First workflow ID"},
+                        "workflow_id_2":{"type":"string","description":"Second workflow ID"}
+                    },
+                    "required":["workflow_id_1","workflow_id_2"]
+                }
+            ),
+            Tool(
+                name="analyze_change_impact",
+                description="⚡ Multi-dimensional impact analysis: data flow, execution, dependencies, triggers, downstream workflows. Calculates overall risk score (0-10).",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "workflow_id":{"type":"string","description":"Current workflow ID"},
+                        "new_workflow":{"type":"object","description":"Proposed workflow changes"},
+                        "include_downstream":{"type":"boolean","description":"Check impact on workflows that call this one","default":True}
+                    },
+                    "required":["workflow_id","new_workflow"]
+                }
+            ),
+            Tool(
+                name="create_change_request",
+                description="📝 Create change request for approval workflow: documents changes, requester, reason. Returns request ID for tracking.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "workflow_id":{"type":"string","description":"Workflow ID"},
+                        "workflow_name":{"type":"string","description":"Workflow name"},
+                        "changes":{"type":"object","description":"Proposed changes"},
+                        "reason":{"type":"string","description":"Why this change is needed"},
+                        "requester":{"type":"string","description":"Person requesting change"}
+                    },
+                    "required":["workflow_id","workflow_name","changes","reason","requester"]
+                }
+            ),
+            Tool(
+                name="review_change_request",
+                description="✅ Approve or reject change request: adds reviewer, comments, updates status.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "request_id":{"type":"string","description":"Change request ID"},
+                        "action":{"type":"string","enum":["approve","reject"],"description":"Review decision"},
+                        "reviewer":{"type":"string","description":"Person reviewing"},
+                        "comments":{"type":"string","description":"Review comments/reason"}
+                    },
+                    "required":["request_id","action","reviewer"]
+                }
+            ),
+            Tool(
+                name="get_change_history",
+                description="📜 Get change request history for workflow: all past changes, approvals, rejections with timestamps.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "workflow_id":{"type":"string","description":"Workflow ID"}
+                    },
+                    "required":["workflow_id"]
+                }
             )
         ]
 
@@ -2835,6 +2920,290 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         severity = item.get('severity', 'low')
                         action = item.get('action', '')
                         result += f"{priority}. **[{severity.upper()}]** {action}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "simulate_workflow_changes":
+                workflow_id = arguments["workflow_id"]
+                new_workflow = arguments["new_workflow"]
+
+                # Fetch old workflow
+                old_workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Run dry-run simulation
+                simulation = DryRunSimulator.simulate(
+                    new_workflow,
+                    validator=workflow_validator,
+                    semantic_analyzer=semantic_analyzer
+                )
+
+                # Generate diff
+                diff = WorkflowDiffEngine.compare_workflows(old_workflow, new_workflow)
+
+                # Analyze impact
+                all_workflows = await n8n_client.list_workflows()
+                impact = ChangeImpactAnalyzer.analyze_impact(
+                    diff, old_workflow, new_workflow, all_workflows
+                )
+
+                # Format as terraform-style plan
+                plan_output = ChangeFormatter.format_plan(diff, impact)
+
+                # Add simulation results
+                result = plan_output + "\n\n"
+                result += "=" * 80 + "\n"
+                result += "DRY-RUN SIMULATION\n"
+                result += "=" * 80 + "\n\n"
+
+                if simulation["simulation_passed"]:
+                    result += "✅ Simulation PASSED - Workflow is valid\n\n"
+                else:
+                    result += "❌ Simulation FAILED - Workflow has errors\n\n"
+
+                if simulation["errors"]:
+                    result += "**Errors:**\n"
+                    for error in simulation["errors"]:
+                        result += f"  - {error}\n"
+                    result += "\n"
+
+                if simulation.get("estimated_performance"):
+                    perf = simulation["estimated_performance"]
+                    result += "**Estimated Performance:**\n"
+                    result += f"  - Node Count: {perf['node_count']}\n"
+                    result += f"  - Duration: ~{perf['estimated_duration_seconds']}s\n"
+                    result += f"  - Memory: ~{perf['estimated_memory_mb']}MB\n"
+                    result += f"  - Complexity: {perf['complexity'].upper()}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "compare_workflows":
+                workflow_id_1 = arguments["workflow_id_1"]
+                workflow_id_2 = arguments["workflow_id_2"]
+
+                # Fetch both workflows
+                workflow_1 = await n8n_client.get_workflow(workflow_id_1)
+                workflow_2 = await n8n_client.get_workflow(workflow_id_2)
+
+                # Generate diff
+                diff = WorkflowDiffEngine.compare_workflows(workflow_1, workflow_2)
+
+                # Format comparison
+                comparison = ChangeFormatter.format_comparison(workflow_1, workflow_2, diff)
+
+                # Add detailed diff
+                result = comparison + "\n\n"
+                result += "=" * 80 + "\n"
+                result += "DETAILED CHANGES\n"
+                result += "=" * 80 + "\n\n"
+
+                # Nodes
+                if diff["nodes"]["added"]:
+                    result += f"**Added Nodes ({len(diff['nodes']['added'])}):**\n"
+                    for node in diff["nodes"]["added"][:10]:
+                        result += f"  + {node['name']} ({node.get('type', 'unknown')})\n"
+                    result += "\n"
+
+                if diff["nodes"]["removed"]:
+                    result += f"**Removed Nodes ({len(diff['nodes']['removed'])}):**\n"
+                    for node in diff["nodes"]["removed"][:10]:
+                        result += f"  - {node['name']} ({node.get('type', 'unknown')})\n"
+                    result += "\n"
+
+                if diff["nodes"]["modified"]:
+                    result += f"**Modified Nodes ({len(diff['nodes']['modified'])}):**\n"
+                    for mod in diff["nodes"]["modified"][:10]:
+                        result += f"  ~ {mod['node_name']}\n"
+                        for change in mod["changes"][:3]:
+                            result += f"      {change['field']}: {change.get('old_value', 'N/A')} → {change.get('new_value', 'N/A')}\n"
+                    result += "\n"
+
+                # Connections
+                if diff["connections"]["added"]:
+                    result += f"**Added Connections ({len(diff['connections']['added'])}):**\n"
+                    for conn in diff["connections"]["added"][:10]:
+                        result += f"  + {conn['from']} → {conn['to']}\n"
+                    result += "\n"
+
+                if diff["connections"]["removed"]:
+                    result += f"**Removed Connections ({len(diff['connections']['removed'])}):**\n"
+                    for conn in diff["connections"]["removed"][:10]:
+                        result += f"  - {conn['from']} → {conn['to']}\n"
+                    result += "\n"
+
+                # Breaking changes
+                if diff["breaking_changes"]:
+                    result += f"**⚠️ Breaking Changes ({len(diff['breaking_changes'])}):**\n"
+                    for bc in diff["breaking_changes"]:
+                        result += f"  - [{bc['severity'].upper()}] {bc['description']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "analyze_change_impact":
+                workflow_id = arguments["workflow_id"]
+                new_workflow = arguments["new_workflow"]
+                include_downstream = arguments.get("include_downstream", True)
+
+                # Fetch old workflow
+                old_workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Generate diff
+                diff = WorkflowDiffEngine.compare_workflows(old_workflow, new_workflow)
+
+                # Analyze impact
+                all_workflows = []
+                if include_downstream:
+                    all_workflows = await n8n_client.list_workflows()
+
+                impact = ChangeImpactAnalyzer.analyze_impact(
+                    diff, old_workflow, new_workflow, all_workflows
+                )
+
+                # Format result
+                result = "# Change Impact Analysis\n\n"
+                result += f"**Overall Risk Score**: {impact['overall_risk_score']}/10\n"
+                result += f"**Risk Level**: {impact['risk_level'].upper()}\n\n"
+
+                # Impact dimensions
+                dimensions = [
+                    ("🔄 Data Flow Impact", "data_flow_impact"),
+                    ("⚡ Execution Impact", "execution_impact"),
+                    ("🔗 Dependency Impact", "dependency_impact"),
+                    ("🔔 Trigger Impact", "trigger_impact"),
+                    ("⚙️ Downstream Impact", "downstream_impact"),
+                ]
+
+                for dim_name, dim_key in dimensions:
+                    dim_impact = impact[dim_key]
+                    if dim_impact["impacts"]:
+                        result += f"## {dim_name}\n\n"
+                        result += f"**Summary**: {dim_impact['summary']}\n"
+                        result += f"**Breaking Changes**: {'Yes' if dim_impact['has_breaking_changes'] else 'No'}\n\n"
+
+                        for imp in dim_impact["impacts"][:5]:
+                            severity = imp.get("severity", "unknown")
+                            result += f"- **[{severity.upper()}]** {imp['description']}\n"
+                            if imp.get("node"):
+                                result += f"  - Node: `{imp['node']}`\n"
+                            if imp.get("affected_paths"):
+                                result += f"  - Affected: {len(imp['affected_paths'])} path(s)\n"
+                        result += "\n"
+
+                # Recommendations
+                if impact["recommendations"]:
+                    result += "## 💡 Recommendations\n\n"
+                    for rec in impact["recommendations"]:
+                        result += f"- {rec}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "create_change_request":
+                workflow_id = arguments["workflow_id"]
+                workflow_name = arguments["workflow_name"]
+                changes = arguments["changes"]
+                reason = arguments["reason"]
+                requester = arguments["requester"]
+
+                # Create request
+                request = approval_workflow.create_request(
+                    workflow_id, workflow_name, changes, reason, requester
+                )
+
+                result = f"# Change Request Created\n\n"
+                result += f"**Request ID**: {request.id}\n"
+                result += f"**Workflow**: {request.workflow_name} ({request.workflow_id})\n"
+                result += f"**Status**: {request.status}\n"
+                result += f"**Requester**: {request.requester}\n"
+                result += f"**Reason**: {request.reason}\n"
+                result += f"**Created**: {request.created_at}\n\n"
+                result += "✅ Request created successfully. Use `review_change_request` to approve or reject.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "review_change_request":
+                request_id = arguments["request_id"]
+                action = arguments["action"]
+                reviewer = arguments["reviewer"]
+                comments = arguments.get("comments", "")
+
+                # Perform action
+                if action == "approve":
+                    response = approval_workflow.approve_request(request_id, reviewer, comments)
+                elif action == "reject":
+                    response = approval_workflow.reject_request(request_id, reviewer, comments)
+                else:
+                    return [TextContent(type="text", text=f"Invalid action: {action}. Must be 'approve' or 'reject'.")]
+
+                if not response["success"]:
+                    return [TextContent(type="text", text=f"❌ Error: {response['error']}")]
+
+                request_data = response["request"]
+                result = f"# Change Request {'Approved' if action == 'approve' else 'Rejected'}\n\n"
+                result += f"**Request ID**: {request_data['id']}\n"
+                result += f"**Workflow**: {request_data['workflow_name']}\n"
+                result += f"**Status**: {request_data['status']}\n"
+                result += f"**Reviewer**: {request_data['reviewer']}\n"
+                result += f"**Reviewed**: {request_data['reviewed_at']}\n"
+
+                if request_data.get("review_comments"):
+                    result += f"**Comments**: {request_data['review_comments']}\n"
+
+                if action == "approve":
+                    result += "\n✅ Request approved. You can now apply the changes to the workflow.\n"
+                else:
+                    result += "\n❌ Request rejected. Changes will not be applied.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_change_history":
+                workflow_id = arguments["workflow_id"]
+
+                # Get history
+                history = approval_workflow.get_workflow_history(workflow_id)
+
+                if not history:
+                    return [TextContent(type="text", text=f"No change history found for workflow {workflow_id}")]
+
+                result = f"# Change History\n\n"
+                result += f"**Total Requests**: {len(history)}\n\n"
+
+                # Group by status
+                status_groups = {}
+                for req in history:
+                    status = req["status"]
+                    if status not in status_groups:
+                        status_groups[status] = []
+                    status_groups[status].append(req)
+
+                result += "**Status Summary**:\n"
+                for status, requests in status_groups.items():
+                    result += f"  - {status}: {len(requests)}\n"
+                result += "\n"
+
+                # Show recent requests
+                result += "## Recent Changes\n\n"
+                for req in sorted(history, key=lambda x: x["created_at"], reverse=True)[:10]:
+                    status_icon = {
+                        "pending": "⏳",
+                        "approved": "✅",
+                        "rejected": "❌",
+                        "applied": "✔️",
+                        "failed": "⚠️"
+                    }.get(req["status"], "❓")
+
+                    result += f"### {status_icon} Request {req['id']}\n"
+                    result += f"- **Status**: {req['status']}\n"
+                    result += f"- **Requester**: {req['requester']}\n"
+                    result += f"- **Reason**: {req['reason']}\n"
+                    result += f"- **Created**: {req['created_at']}\n"
+
+                    if req.get("reviewer"):
+                        result += f"- **Reviewer**: {req['reviewer']}\n"
+                    if req.get("reviewed_at"):
+                        result += f"- **Reviewed**: {req['reviewed_at']}\n"
+                    if req.get("review_comments"):
+                        result += f"- **Comments**: {req['review_comments']}\n"
+
+                    result += "\n"
 
                 return [TextContent(type="text", text=result)]
 

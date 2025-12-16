@@ -114,6 +114,18 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **AI-Native**: Designed for LLM consumption with structured, consistent output
 - **Zero Configuration**: Works instantly with any n8n workflow
 
+### 🔮 Change Simulation & Approval System (NEW!)
+- **Terraform-Style Preview**: Like `terraform plan` for n8n workflows - see changes before applying
+- **Breaking Change Detection**: Automatically identifies critical changes (trigger removal, connection changes)
+- **Multi-Dimensional Impact Analysis**: Analyzes impact across 5 dimensions (data flow, execution, dependencies, triggers, downstream)
+- **Risk Scoring**: 0-10 risk score with severity levels (low, medium, high, critical)
+- **Dry-Run Validation**: Validates structure, semantics, and performance without applying changes
+- **Approval Workflow**: Create, review, approve/reject change requests with full audit trail
+- **Change History**: Complete history of all workflow changes with timestamps and reviewers
+- **Color-Coded Output**: 🔴 Breaking, 🟡 Structural, 🟢 Safe changes
+- **Performance Estimation**: Predicts execution time, memory usage, complexity
+- **Recommendations**: Actionable suggestions based on impact analysis
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
@@ -298,6 +310,118 @@ Affected Workflows (3):
 
 Total Impact: 3 workflows, 6 nodes affected
 Recommendation: Plan maintenance window and notify stakeholders
+```
+
+### 7. Change Simulation & Safe Deployments (NEW!)
+```
+You: "I want to update the Payment Processing workflow to use the new Stripe API v2"
+
+Claude + MCP: Uses simulate_workflow_changes
+
+================================================================================
+WORKFLOW CHANGE PLAN
+================================================================================
+
+Total Changes: 5
+Risk Level: MEDIUM
+
+🔴 BREAKING CHANGES
+--------------------------------------------------------------------------------
+  • [HIGH] 1 connection(s) removed
+    Impact: Data flow will be interrupted
+    Recommendation: Verify that removed connections are intentional
+
+🟡 STRUCTURAL CHANGES
+--------------------------------------------------------------------------------
+  ~ Modified node: 'Process Payment'
+      parameters.apiVersion: v1 → v2
+      parameters.endpoint: /charges → /payment_intents
+      credentials: stripe_v1 → stripe_v2
+
+🟢 DATA FLOW CHANGES
+--------------------------------------------------------------------------------
+  No data flow changes
+
+⚠️  IMPACT ASSESSMENT
+--------------------------------------------------------------------------------
+Overall Risk Score: 4.5/10 (MEDIUM)
+
+  Dependency Impact:
+    • 1 new credential(s) required: stripe_v2
+    • 1 new external service(s) added: Stripe API v2
+
+  Downstream Impact:
+    • Changes will affect 2 workflow(s) that call this workflow
+      - Order Processing (calls this workflow)
+      - Refund Handler (calls this workflow)
+
+💡 RECOMMENDATIONS
+--------------------------------------------------------------------------------
+  🔑 Configure 1 new credential(s) before deployment
+  🌐 Verify connectivity to new external service(s): Stripe API v2
+  ⚙️  Review and update 2 downstream workflow(s)
+  🧪 Run end-to-end tests to verify execution behavior
+
+================================================================================
+⚠️  WARNING: This change contains breaking changes!
+Review carefully before applying.
+================================================================================
+
+DRY-RUN SIMULATION
+================================================================================
+
+✅ Simulation PASSED - Workflow is valid
+
+**Estimated Performance:**
+  - Node Count: 8
+  - Duration: ~4.0s
+  - Memory: ~80MB
+  - Complexity: MEDIUM
+
+You: "Create a change request for team review"
+
+Claude + MCP: Uses create_change_request
+
+✅ Change Request Created
+
+**Request ID**: a3b4c5d6
+**Workflow**: Payment Processing (8PyhAN1U4JvF5eSb)
+**Status**: pending
+**Requester**: dev.team
+**Reason**: Migrate to Stripe API v2 for PSD2 compliance
+**Created**: 2024-12-16T10:30:00Z
+
+[Team Lead reviews and approves]
+
+You: "Show me the change history for this workflow"
+
+Claude + MCP: Uses get_change_history
+
+# Change History
+
+**Total Requests**: 12
+
+Status Summary:
+  - applied: 10
+  - rejected: 1
+  - pending: 1
+
+Recent Changes:
+
+✅ Request a3b4c5d6
+- Status: approved
+- Requester: dev.team
+- Reason: Migrate to Stripe API v2
+- Reviewer: team.lead
+- Comments: Approved - tested in staging environment
+- Reviewed: 2024-12-16T14:20:00Z
+
+✔️ Request x1y2z3a4
+- Status: applied
+- Requester: dev.team
+- Reason: Add retry logic to payment processing
+- Reviewer: senior.dev
+- Applied: 2024-12-10T09:15:00Z
 ```
 
 ## 📦 Installation
@@ -1068,6 +1192,28 @@ For detailed information about the explainability layer, see:
 - 5-category risk assessment (data loss, security, performance, availability, compliance)
 - Multi-format export (Markdown/JSON/Plain Text)
 - Zero configuration, works with any workflow
+
+## 🔮 Change Simulation & Approval Deep Dive
+
+For detailed information about change simulation and approval workflows, see:
+- **[Change Simulation Documentation](releases/v1.12.0.md)** - Complete change simulation guide
+
+**Quick summary:**
+- Terraform-style workflow change preview (like `terraform plan`)
+- Breaking change detection (trigger removal, connection changes, output nodes)
+- Multi-dimensional impact analysis (5 dimensions)
+- Risk scoring algorithm (0-10 scale)
+- Dry-run validation (structure + semantics + performance)
+- Approval workflow with audit trail
+- Performance estimation and recommendations
+
+**6 New MCP Tools:**
+1. `simulate_workflow_changes` - Preview changes with terraform-style plan
+2. `compare_workflows` - Side-by-side workflow comparison
+3. `analyze_change_impact` - Multi-dimensional impact analysis
+4. `create_change_request` - Create approval request
+5. `review_change_request` - Approve/reject changes
+6. `get_change_history` - View workflow change history
 
 ## 📝 License
 
