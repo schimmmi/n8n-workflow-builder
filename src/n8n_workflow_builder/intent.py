@@ -211,7 +211,7 @@ class IntentManager:
                 "recommendation": "Workflow has no nodes"
             }
 
-        nodes_with_intent = sum(1 for node in nodes if "_intent" in node)
+        nodes_with_intent = sum(1 for node in nodes if IntentManager.get_node_intent(node) is not None)
         nodes_without_intent = total_nodes - nodes_with_intent
         coverage_percentage = (nodes_with_intent / total_nodes) * 100
 
@@ -223,7 +223,7 @@ class IntentManager:
         # Check which critical nodes lack intent
         critical_without_intent = []
         for node in logic_nodes + trigger_nodes:
-            if "_intent" not in node:
+            if IntentManager.get_node_intent(node) is None:
                 critical_without_intent.append(node["name"])
 
         # Generate recommendation
