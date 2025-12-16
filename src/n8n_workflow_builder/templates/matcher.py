@@ -72,38 +72,50 @@ class TemplateMatcher:
         score = 0.0
         reasons = []
 
-        # 1. Intent/Purpose matching (40% weight)
+        # 1. Intent/Purpose matching (35% weight) - boosted if high match
         intent_score = self._score_text_similarity(
             query_lower,
-            [template.intent or "", template.purpose or "", template.description]
+            [template.intent or "", template.purpose or "", template.description, template.name]
         )
-        score += intent_score * 0.4
-
-        if intent_score > 0.5:
+        # Boost high intent matches
+        if intent_score > 0.3:
+            score += intent_score * 0.45
             reasons.append(f"Intent matches ({int(intent_score * 100)}%)")
+        else:
+            score += intent_score * 0.35
 
-        # 2. Keyword matching (30% weight)
+        # 2. Keyword matching (25% weight) - with synonym support
         keyword_score = self._score_keywords(query_lower, template)
-        score += keyword_score * 0.3
+        score += keyword_score * 0.25
 
-        if keyword_score > 0.5:
+        if keyword_score > 0.3:
             reasons.append(f"Keywords match ({int(keyword_score * 100)}%)")
 
-        # 3. External systems matching (20% weight)
+        # 3. External systems matching (25% weight) - critical for integration
         systems_score = self._score_external_systems(query_lower, template)
-        score += systems_score * 0.2
+        score += systems_score * 0.25
 
-        if systems_score > 0.5:
+        if systems_score > 0.3:
             matched_systems = [s for s in template.external_systems or [] if s.lower() in query_lower]
             if matched_systems:
                 reasons.append(f"Uses: {', '.join(matched_systems[:3])}")
 
-        # 4. Trigger type matching (10% weight)
+        # 4. Trigger type matching (15% weight) - important for scheduling
         trigger_score = self._score_trigger_type(query_lower, template)
-        score += trigger_score * 0.1
+        score += trigger_score * 0.15
 
-        if trigger_score > 0.8:
+        if trigger_score > 0.5:
             reasons.append(f"Trigger: {template.trigger_type}")
+
+        # 5. BOOST: Direct word matches in query (bonus points)
+        query_words = set(self._tokenize(query_lower))
+        template_words = set(self._tokenize(f"{template.name} {template.description}"))
+        direct_matches = query_words & template_words
+        if direct_matches:
+            boost = min(len(direct_matches) * 0.05, 0.2)  # Max 20% boost
+            score += boost
+            if boost > 0.1:
+                reasons.append(f"{len(direct_matches)} direct word matches")
 
         # Build reason string
         reason_str = " | ".join(reasons) if reasons else "General match"
@@ -137,7 +149,19 @@ class TemplateMatcher:
         return max_score
 
     def _score_keywords(self, query: str, template: TemplateMetadata) -> float:
-        """Score keyword matches"""
+        """Score keyword matches with synonym support"""
+        # Keyword synonyms for better matching
+        synonyms = {
+            "ai": ["artificial intelligence", "ml", "machine learning", "llm", "gpt", "claude"],
+            "notification": ["notify", "alert", "message", "send", "telegram", "slack", "email"],
+            "monitoring": ["track", "watch", "observe", "sensor", "iot", "device"],
+            "analysis": ["analyze", "process", "evaluate", "calculate", "compute"],
+            "sync": ["synchronize", "replicate", "copy", "mirror", "backup"],
+            "api": ["http", "rest", "endpoint", "webhook", "request"],
+            "database": ["db", "postgres", "mysql", "sql", "storage"],
+            "schedule": ["cron", "timer", "periodic", "daily", "hourly", "automated"]
+        }
+
         # Extract important keywords
         keywords = []
         keywords.extend(template.tags or [])
@@ -147,8 +171,22 @@ class TemplateMatcher:
         if template.trigger_type:
             keywords.append(template.trigger_type)
 
-        # Count matches
-        matches = sum(1 for keyword in keywords if keyword.lower() in query)
+        # Count matches (including synonyms)
+        matches = 0
+        for keyword in keywords:
+            keyword_lower = keyword.lower()
+
+            # Direct match
+            if keyword_lower in query:
+                matches += 1
+                continue
+
+            # Synonym match
+            for base_word, synonym_list in synonyms.items():
+                if keyword_lower in synonym_list or keyword_lower == base_word:
+                    if any(syn in query for syn in synonym_list) or base_word in query:
+                        matches += 0.7  # Partial credit for synonym match
+                        break
 
         # Normalize
         if not keywords:
