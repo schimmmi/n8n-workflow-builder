@@ -3,6 +3,7 @@
 N8n Client Module
 HTTP client for n8n API interactions
 """
+import json
 import logging
 from typing import Any, Dict, List, Optional
 

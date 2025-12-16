@@ -1990,7 +1990,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     )]
 
                 # Check if node has intent
-                if "_intent" not in node:
+                if not intent_manager.get_node_intent(node):
                     return [TextContent(
                         type="text",
                         text=f"ℹ️ Node '{node_name}' has no intent metadata to remove"

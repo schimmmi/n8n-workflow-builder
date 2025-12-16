@@ -62,8 +62,13 @@ class IntentManager:
 
         Returns:
             Node with intent metadata added
+
+        Note:
+            Intent is stored in node['parameters']['_intent'] to comply with n8n API schema
         """
-        node["_intent"] = intent
+        if "parameters" not in node:
+            node["parameters"] = {}
+        node["parameters"]["_intent"] = intent
         return node
 
     @staticmethod
@@ -76,7 +81,9 @@ class IntentManager:
         Returns:
             Intent metadata if present, None otherwise
         """
-        return node.get("_intent")
+        if "parameters" in node:
+            return node["parameters"].get("_intent")
+        return None
 
     @staticmethod
     def update_node_intent(node: Dict, updates: Dict) -> Dict:
@@ -89,11 +96,13 @@ class IntentManager:
         Returns:
             Node with updated intent metadata
         """
-        if "_intent" not in node:
-            node["_intent"] = {}
+        if "parameters" not in node:
+            node["parameters"] = {}
+        if "_intent" not in node["parameters"]:
+            node["parameters"]["_intent"] = {}
 
-        node["_intent"].update(updates)
-        node["_intent"]["updated_at"] = datetime.now().isoformat()
+        node["parameters"]["_intent"].update(updates)
+        node["parameters"]["_intent"]["updated_at"] = datetime.now().isoformat()
 
         return node
 
@@ -107,8 +116,8 @@ class IntentManager:
         Returns:
             Node without intent metadata
         """
-        if "_intent" in node:
-            del node["_intent"]
+        if "parameters" in node and "_intent" in node["parameters"]:
+            del node["parameters"]["_intent"]
         return node
 
     @staticmethod
