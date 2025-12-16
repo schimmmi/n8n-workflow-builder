@@ -34,6 +34,14 @@ from .drift.detector import (
     DriftRootCauseAnalyzer,
     DriftFixSuggester
 )
+from .explainability import (
+    WorkflowExplainer,
+    WorkflowPurposeAnalyzer,
+    DataFlowTracer,
+    DependencyMapper,
+    RiskAnalyzer,
+    ExplainabilityFormatter
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -891,6 +899,31 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 name="get_drift_fix_suggestions",
                 description="💡 Get actionable fix suggestions for detected drift. Provides specific changes to apply, with confidence scores and testing recommendations.",
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="explain_workflow",
+                description="📖 Generate comprehensive workflow explanation: purpose, data flow, dependencies, risks. Perfect for audit, onboarding, and documentation.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to explain"},"format":{"type":"string","description":"Output format: markdown, json, or text (default: markdown)","default":"markdown"},"include_analysis":{"type":"boolean","description":"Include semantic analysis and execution history (default: true)","default":True}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="get_workflow_purpose",
+                description="🎯 Quick analysis of workflow purpose and business domain. Identifies what the workflow does and why it exists.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="trace_data_flow",
+                description="🔄 Trace data movement through workflow: sources, transformations, destinations. Identifies critical data paths.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="map_dependencies",
+                description="🔗 Map all workflow dependencies: internal workflows, external services, credentials. Identifies single points of failure.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="analyze_workflow_risks",
+                description="⚠️ Comprehensive risk assessment: data loss, security, performance, availability, compliance risks with mitigation plan.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"},"include_analysis":{"type":"boolean","description":"Include semantic analysis and execution history (default: true)","default":True}},"required":["workflow_id"]}
             )
         ]
 
@@ -2548,6 +2581,253 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "## ✅ Testing Recommendations\n\n"
                     for rec in testing:
                         result += f"- {rec}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "explain_workflow":
+                workflow_id = arguments["workflow_id"]
+                format_type = arguments.get("format", "markdown")
+                include_analysis = arguments.get("include_analysis", True)
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+                all_workflows = await n8n_client.get_workflows()
+
+                # Optional: Fetch semantic analysis and execution history
+                semantic_analysis = None
+                drift_analysis = None
+                execution_history = None
+
+                if include_analysis:
+                    try:
+                        semantic_analysis = semantic_analyzer.analyze_workflow(workflow)
+                    except Exception as e:
+                        logger.warning(f"Could not get semantic analysis: {e}")
+
+                    try:
+                        execution_history = await n8n_client.get_executions(workflow_id, limit=100)
+                        if execution_history:
+                            drift_analysis = DriftDetector.analyze_execution_history(execution_history)
+                    except Exception as e:
+                        logger.warning(f"Could not get execution history: {e}")
+
+                # Generate explanation
+                explanation = WorkflowExplainer.explain_workflow(
+                    workflow,
+                    all_workflows=all_workflows,
+                    semantic_analysis=semantic_analysis,
+                    drift_analysis=drift_analysis,
+                    execution_history=execution_history
+                )
+
+                # Format output
+                formatted = ExplainabilityFormatter.format(explanation, format_type)
+
+                return [TextContent(type="text", text=formatted)]
+
+            elif name == "get_workflow_purpose":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Analyze purpose
+                purpose_analysis = WorkflowPurposeAnalyzer.analyze_purpose(workflow)
+
+                # Format result
+                result = f"# Workflow Purpose: {workflow['name']}\n\n"
+                result += f"**Primary Purpose**: {purpose_analysis.get('primary_purpose')}\n\n"
+                result += f"**Business Domain**: {purpose_analysis.get('business_domain')}\n"
+                result += f"**Workflow Type**: {purpose_analysis.get('workflow_type')}\n"
+                result += f"**Confidence**: {purpose_analysis.get('confidence', 0)*100:.0f}%\n\n"
+                result += f"**Description**: {purpose_analysis.get('description')}\n\n"
+
+                # Trigger
+                result += "## Trigger\n\n"
+                result += f"{purpose_analysis.get('trigger_description')}\n\n"
+
+                # Expected Outcomes
+                outcomes = purpose_analysis.get('expected_outcomes', [])
+                if outcomes:
+                    result += "## Expected Outcomes\n\n"
+                    for outcome in outcomes:
+                        result += f"- {outcome}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "trace_data_flow":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Trace data flow
+                data_flow = DataFlowTracer.trace_data_flow(workflow)
+
+                # Format result
+                result = f"# Data Flow: {workflow['name']}\n\n"
+                result += f"**Summary**: {data_flow.get('summary')}\n\n"
+
+                # Input Sources
+                input_sources = data_flow.get("input_sources", [])
+                if input_sources:
+                    result += "## Input Sources\n\n"
+                    for source in input_sources:
+                        result += f"- **{source['node_name']}**: {source['source_type']}\n"
+                        details = source.get('details', {})
+                        if details.get('url'):
+                            result += f"  - URL: `{details['url']}`\n"
+                    result += "\n"
+
+                # Transformations
+                transformations = data_flow.get("transformations", [])
+                if transformations:
+                    result += "## Transformations\n\n"
+                    for trans in transformations:
+                        result += f"- **{trans['node_name']}**: {trans['transformation_type']}\n"
+                    result += "\n"
+
+                # Output Destinations
+                output_destinations = data_flow.get("output_destinations", [])
+                if output_destinations:
+                    result += "## Output Destinations\n\n"
+                    for dest in output_destinations:
+                        result += f"- **{dest['node_name']}**: {dest['sink_type']}\n"
+                    result += "\n"
+
+                # Critical Paths
+                critical_paths = data_flow.get("critical_paths", [])
+                if critical_paths:
+                    result += "## Critical Data Paths\n\n"
+                    for idx, path in enumerate(critical_paths[:5], 1):
+                        path_str = " → ".join(path['path'])
+                        result += f"{idx}. {path_str}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "map_dependencies":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow and all workflows (for cross-workflow deps)
+                workflow = await n8n_client.get_workflow(workflow_id)
+                all_workflows = await n8n_client.get_workflows()
+
+                # Map dependencies
+                dependencies = DependencyMapper.map_dependencies(workflow, all_workflows)
+
+                # Format result
+                result = f"# Dependencies: {workflow['name']}\n\n"
+                result += f"**Summary**: {dependencies.get('summary')}\n\n"
+
+                # Internal Dependencies
+                internal_deps = dependencies.get("internal_dependencies", [])
+                if internal_deps:
+                    result += "## Internal Dependencies\n\n"
+                    for dep in internal_deps:
+                        if dep["type"] == "workflow_call":
+                            result += f"- Calls workflow: **{dep['target_workflow_name']}**\n"
+                            result += f"  - Node: `{dep['node_name']}`\n"
+                            result += f"  - Criticality: {dep['criticality']}\n"
+                    result += "\n"
+
+                # External Dependencies
+                external_deps = dependencies.get("external_dependencies", [])
+                if external_deps:
+                    result += "## External Dependencies\n\n"
+                    for dep in external_deps:
+                        result += f"- **{dep['service_name']}** ({dep.get('service_type', 'unknown')})\n"
+                        if dep.get('endpoint'):
+                            result += f"  - Endpoint: `{dep['endpoint']}`\n"
+                    result += "\n"
+
+                # Credentials
+                credentials = dependencies.get("credentials", [])
+                if credentials:
+                    result += "## Credentials\n\n"
+                    for cred in credentials:
+                        result += f"- **{cred['credential_name']}** ({cred['credential_type']})\n"
+                        result += f"  - Criticality: {cred['criticality']}\n"
+                        result += f"  - Used by: {', '.join(cred['used_by_nodes'])}\n"
+                    result += "\n"
+
+                # Single Points of Failure
+                spofs = dependencies.get("single_points_of_failure", [])
+                if spofs:
+                    result += "## ⚠️ Single Points of Failure\n\n"
+                    for spof in spofs:
+                        result += f"- **{spof.get('type')}** (Severity: {spof.get('severity')})\n"
+                        result += f"  - {spof.get('impact')}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "analyze_workflow_risks":
+                workflow_id = arguments["workflow_id"]
+                include_analysis = arguments.get("include_analysis", True)
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Optional: Fetch semantic analysis and execution history
+                semantic_analysis = None
+                drift_analysis = None
+                execution_history = None
+
+                if include_analysis:
+                    try:
+                        semantic_analysis = semantic_analyzer.analyze_workflow(workflow)
+                    except Exception as e:
+                        logger.warning(f"Could not get semantic analysis: {e}")
+
+                    try:
+                        execution_history = await n8n_client.get_executions(workflow_id, limit=100)
+                        if execution_history:
+                            drift_analysis = DriftDetector.analyze_execution_history(execution_history)
+                    except Exception as e:
+                        logger.warning(f"Could not get execution history: {e}")
+
+                # Analyze risks
+                risk_analysis = WorkflowExplainer.analyze_risks(
+                    workflow,
+                    semantic_analysis=semantic_analysis,
+                    drift_analysis=drift_analysis,
+                    execution_history=execution_history
+                )
+
+                # Format result
+                result = f"# Risk Assessment: {workflow['name']}\n\n"
+                result += f"**Overall Risk Level**: {risk_analysis.get('risk_level', 'low').upper()}\n"
+                result += f"**Risk Score**: {risk_analysis.get('overall_risk_score', 0):.1f}/10\n\n"
+                result += f"**Summary**: {risk_analysis.get('risk_summary')}\n\n"
+
+                # Risk Categories
+                risk_categories = [
+                    ("🔴 Data Loss Risks", "data_loss_risks"),
+                    ("🔐 Security Risks", "security_risks"),
+                    ("⚡ Performance Risks", "performance_risks"),
+                    ("🚨 Availability Risks", "availability_risks"),
+                    ("📋 Compliance Risks", "compliance_risks"),
+                ]
+
+                for category_name, category_key in risk_categories:
+                    category_risks = risk_analysis.get(category_key, [])
+                    if category_risks:
+                        result += f"## {category_name}\n\n"
+                        for risk in category_risks[:5]:  # Top 5 per category
+                            severity = risk.get('severity', 'low')
+                            result += f"- **[{severity.upper()}]** {risk.get('description')}\n"
+                            if risk.get('node'):
+                                result += f"  - Node: `{risk['node']}`\n"
+                        result += "\n"
+
+                # Mitigation Plan
+                mitigation_plan = risk_analysis.get("mitigation_plan", [])
+                if mitigation_plan:
+                    result += "## 🛠️ Mitigation Plan\n\n"
+                    for item in mitigation_plan[:10]:  # Top 10
+                        priority = item.get('priority', '?')
+                        severity = item.get('severity', 'low')
+                        action = item.get('action', '')
+                        result += f"{priority}. **[{severity.upper()}]** {action}\n"
 
                 return [TextContent(type="text", text=result)]
 
