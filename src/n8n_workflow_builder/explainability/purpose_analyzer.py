@@ -274,10 +274,19 @@ class WorkflowPurposeAnalyzer:
             descriptions.append("Triggered by external HTTP requests")
 
         elif "schedule" in trigger_type.lower() or "cron" in trigger_type.lower():
-            interval = trigger_params.get("rule", {}).get("interval", [])
+            rule = trigger_params.get("rule", {})
+            # Handle both dict and list formats
+            if isinstance(rule, dict):
+                interval = rule.get("interval", [])
+            elif isinstance(rule, list):
+                interval = rule
+            else:
+                interval = []
+
             if isinstance(interval, list) and interval:
-                cron_expr = interval[0].get("expression", "") if interval else ""
-                descriptions.append(f"Runs on schedule: {cron_expr}")
+                cron_expr = interval[0].get("expression", "") if isinstance(interval[0], dict) else str(interval[0])
+                if cron_expr:
+                    descriptions.append(f"Runs on schedule: {cron_expr}")
             descriptions.append("Automatically executes at specified times")
 
         elif "manual" in trigger_type.lower():

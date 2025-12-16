@@ -313,8 +313,25 @@ class RiskAnalyzer:
             durations = []
             for exec in execution_history:
                 if exec.get("finished", True) and exec.get("startedAt") and exec.get("stoppedAt"):
-                    duration = (exec["stoppedAt"] - exec["startedAt"]) / 1000  # Convert to seconds
-                    durations.append(duration)
+                    try:
+                        # Handle both string and int timestamps
+                        started = exec["startedAt"]
+                        stopped = exec["stoppedAt"]
+
+                        # Convert to datetime if strings
+                        if isinstance(started, str):
+                            from datetime import datetime
+                            started_dt = datetime.fromisoformat(started.replace('Z', '+00:00'))
+                            stopped_dt = datetime.fromisoformat(stopped.replace('Z', '+00:00'))
+                            duration = (stopped_dt - started_dt).total_seconds()
+                        else:
+                            # Already timestamps in milliseconds
+                            duration = (stopped - started) / 1000
+
+                        durations.append(duration)
+                    except (ValueError, TypeError):
+                        # Skip if timestamp parsing fails
+                        continue
 
             if durations:
                 avg_duration = sum(durations) / len(durations)
