@@ -330,14 +330,27 @@ class DataFlowTracer:
 
         for source_node, outputs in connections.items():
             for output_type, output_connections in outputs.items():
-                for conn in output_connections:
-                    target_node = conn.get("node", "")
-                    if target_node in adjacency:
-                        adjacency[source_node].append({
-                            "target": target_node,
-                            "output": output_type,
-                            "input": conn.get("type", ""),
-                        })
+                # output_connections is List[List[Dict]], need to flatten
+                for connection_group in output_connections:
+                    if isinstance(connection_group, list):
+                        for conn in connection_group:
+                            target_node = conn.get("node", "")
+                            if target_node in adjacency:
+                                adjacency[source_node].append({
+                                    "target": target_node,
+                                    "output": output_type,
+                                    "input": conn.get("type", ""),
+                                })
+                    else:
+                        # Fallback for old format (if connection_group is dict directly)
+                        conn = connection_group
+                        target_node = conn.get("node", "")
+                        if target_node in adjacency:
+                            adjacency[source_node].append({
+                                "target": target_node,
+                                "output": output_type,
+                                "input": conn.get("type", ""),
+                            })
 
         # Find all paths using DFS
         def dfs_paths(current: str, path: List[str], visited: Set[str]):
@@ -409,14 +422,27 @@ class DataFlowTracer:
         # Add all edges (connections)
         for source_node, outputs in connections.items():
             for output_type, output_connections in outputs.items():
-                for conn in output_connections:
-                    target_node = conn.get("node", "")
-                    lineage["edges"].append({
-                        "from": source_node,
-                        "to": target_node,
-                        "output": output_type,
-                        "input": conn.get("type", ""),
-                    })
+                # output_connections is List[List[Dict]], need to flatten
+                for connection_group in output_connections:
+                    if isinstance(connection_group, list):
+                        for conn in connection_group:
+                            target_node = conn.get("node", "")
+                            lineage["edges"].append({
+                                "from": source_node,
+                                "to": target_node,
+                                "output": output_type,
+                                "input": conn.get("type", ""),
+                            })
+                    else:
+                        # Fallback for old format
+                        conn = connection_group
+                        target_node = conn.get("node", "")
+                        lineage["edges"].append({
+                            "from": source_node,
+                            "to": target_node,
+                            "output": output_type,
+                            "input": conn.get("type", ""),
+                        })
 
         return lineage
 
