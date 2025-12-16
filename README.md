@@ -55,7 +55,17 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Use Cases & Examples**: Practical examples for each node type
 - **Configuration Tips**: How to optimally configure each node
 
-### 🎯 Template Library & AI Recommendations (NEW!)
+### 🔬 Semantic Workflow Analysis (NEW!)
+- **Deep Logic Analysis**: Goes beyond schema validation to understand workflow semantics
+- **12 Anti-Pattern Checks**: HTTP retry, loop completion, timezone config, IF paths, webhook security, infinite loops, credentials, N+1 queries, rate limiting, data validation, and more
+- **LLM-Friendly Fixes**: Copy-paste ready code fixes for AI agents
+- **Severity Levels**: Critical, High, Medium, Low prioritization
+- **Detailed Explanations**: Why each issue matters and how it impacts workflows
+- **Security Scanning**: Detects hardcoded credentials with regex patterns
+- **Performance Analysis**: Identifies bottlenecks like N+1 queries
+- **Formatted Reports**: Structured output optimized for AI consumption
+
+### 🎯 Template Library & AI Recommendations
 - **10+ Pre-Built Templates**: Ready-to-use workflow templates for common use cases
 - **AI-Powered Recommendations**: Get intelligent template suggestions based on your description
 - **Smart Relevance Scoring**: Advanced algorithm matches templates to your requirements (70-90% accuracy)
@@ -337,6 +347,28 @@ Claude uses: get_template_details
   - Implementation guide
   - Estimated time: 20 minutes
   - Use cases and best practices
+```
+
+### Semantic Workflow Analysis (NEW!)
+```
+You: "Analyze workflow 'Payment Processing' for logic issues"
+
+Claude uses: analyze_workflow_semantics
+→ Deep semantic analysis report:
+  🚨 Critical Issues:
+  - SplitInBatches without completion loop (Node: Split Orders)
+  - Hardcoded API key detected (Node: Payment Gateway)
+
+  ⚠️ High Priority:
+  - HTTP Request without retry logic (Node: Payment Gateway)
+  - IF node without false path (Node: Check Amount)
+  - Webhook without authentication (Node: Webhook Trigger)
+
+  💡 Recommendations:
+  - Add error handling for external API calls
+  - Consolidate 3 consecutive Set nodes for better performance
+
+  🤖 LLM Fixes: Copy-paste ready code for each issue
 ```
 
 ### Get Execution Details

@@ -2705,6 +2705,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     n8n_client = N8nClient(api_url, api_key)
     workflow_builder = WorkflowBuilder()
     workflow_validator = WorkflowValidator()
+    semantic_analyzer = SemanticWorkflowAnalyzer()
     ai_feedback_analyzer = AIFeedbackAnalyzer()
     state_manager = StateManager()
     rbac_manager = RBACManager()
@@ -3056,6 +3057,27 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["workflow"]
+                }
+            ),
+            Tool(
+                name="analyze_workflow_semantics",
+                description=(
+                    "🔬 Deep semantic analysis of workflow logic and patterns. "
+                    "Goes beyond schema validation to detect anti-patterns, logic errors, "
+                    "security issues, and performance problems. Provides LLM-friendly fix suggestions. "
+                    "Checks: HTTP retry patterns, loop completeness, timezone config, IF node paths, "
+                    "webhook security, infinite loops, credential usage, N+1 queries, rate limiting, "
+                    "data validation, and more. Returns copy-paste ready code fixes."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to analyze"
+                        }
+                    },
+                    "required": ["workflow_id"]
                 }
             ),
             Tool(
@@ -3919,6 +3941,30 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "🎉 Perfect! No errors or warnings found.\n"
 
                 return [TextContent(type="text", text=result)]
+
+            elif name == "analyze_workflow_semantics":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+                workflow_name = workflow.get('name', 'Unnamed Workflow')
+
+                # Run semantic analysis
+                analysis = semantic_analyzer.analyze_workflow_semantics(workflow)
+
+                # Log action
+                state_manager.log_action("analyze_workflow_semantics", {
+                    "workflow_id": workflow_id,
+                    "workflow_name": workflow_name,
+                    "total_issues": sum(analysis['severity'].values()),
+                    "critical": analysis['severity']['critical'],
+                    "high": analysis['severity']['high']
+                })
+
+                # Format report
+                report = semantic_analyzer.format_analysis_report(analysis, workflow_name)
+
+                return [TextContent(type="text", text=report)]
 
             elif name == "analyze_execution_errors":
                 execution_id = arguments["execution_id"]
