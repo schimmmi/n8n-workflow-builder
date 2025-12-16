@@ -27,6 +27,21 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Execution Details**: Retrieve complete node input/output data for each execution
 - **Execution History**: List of all past executions with status
 
+### 🔄 Session State & Context Management
+- **Active Workflow Tracking**: Automatically tracks which workflow you're currently working on
+- **Session History**: Logs all your actions (analyze, execute, update, etc.)
+- **Recent Workflows**: Quick access to your last 10 workflows
+- **Persistent State**: Context survives between Claude conversations
+- **Smart Context**: Reference workflows by "current" or "last workflow" instead of IDs
+
+### ✅ Workflow Validation & Quality Assurance
+- **Pre-Deployment Validation**: Comprehensive checks before deploying workflows
+- **Schema Validation**: Ensures workflow structure is correct (required fields, types, etc.)
+- **Semantic Validation**: Checks logical rules (trigger nodes, connections, duplicates)
+- **Parameter Validation**: Node-specific parameter checks (webhooks, HTTP, databases, etc.)
+- **Security Checks**: Detects hardcoded credentials, missing authentication
+- **Best Practices**: Warns about default names, missing error handling, complexity
+
 ### 📚 Knowledge Base
 - **Node Encyclopedia**: Detailed explanations of all important n8n nodes
 - **Use Cases & Examples**: Practical examples for each node type
@@ -260,6 +275,64 @@ Claude uses: get_execution_details
 - ✅ Save manual executions
 - ✅ Save execution progress
 
+### Context & State Management
+```
+You: "What workflow was I working on?"
+
+Claude uses: get_session_state
+→ Shows active workflow, recent workflows, and action history
+```
+
+```
+You: "Analyze the current workflow"
+
+Claude: Uses the last active workflow automatically
+```
+
+```
+You: "Show me my recent workflows"
+
+Claude uses: get_recent_workflows
+→ List of last 10 workflows with timestamps
+```
+
+```
+You: "What did I do in this session?"
+
+Claude uses: get_session_history
+→ Timeline of all actions (analyze, execute, update, etc.)
+```
+
+### Workflow Validation
+```
+You: "Validate workflow abc-123 before deploying"
+
+Claude uses: validate_workflow
+→ Comprehensive validation report with errors and warnings
+```
+
+**Example Output:**
+```
+❌ Validation Failed
+
+Errors (must fix):
+1. Webhook node 'API Endpoint': No authentication enabled (security risk)
+2. Node 'HTTP Request': Missing 'url' parameter
+3. Duplicate node names found: Set
+
+Warnings (should fix):
+1. Nodes with default names (should be renamed): HTTP Request, Set
+2. Postgres node 'Database Query': Using SELECT * (bad practice)
+3. Workflow lacks error handling (Error Trigger node)
+```
+
+```
+You: "Validate this workflow JSON before creating it"
+
+Claude uses: validate_workflow_json
+→ Validates structure before workflow creation
+```
+
 ## 🧠 Knowledge Base
 
 The server knows these node categories:
@@ -306,6 +379,21 @@ The server comes with predefined templates:
 - Calculate workflow complexity
 - Detect oversized workflows
 - Suggest splits for better maintainability
+
+## 💾 State File
+
+The server stores session state in `~/.n8n_workflow_builder_state.json`. This file contains:
+- Currently active workflow
+- Recent workflows (last 10)
+- Session history (last 50 actions)
+- Timestamps
+
+This allows the server to maintain context between Claude conversations!
+
+**To reset state:** Use the `clear_session_state` tool or delete the file manually:
+```bash
+rm ~/.n8n_workflow_builder_state.json
+```
 
 ## 🐛 Troubleshooting
 
@@ -364,6 +452,32 @@ cat .env
 - **NEVER** hardcode API keys - always use credentials
 - Enable webhook authentication
 - Only store sensitive data encrypted
+
+## 🔄 State Management Deep Dive
+
+For detailed information about the state management and context tracking system, see:
+- **[State Management Documentation](docs/STATE_MANAGEMENT.md)** - Complete guide
+- **[State File Example](docs/state_example.json)** - Example state file
+
+**Quick summary:**
+- Automatically tracks active workflow
+- Remembers last 10 workflows
+- Logs last 50 actions with timestamps
+- Persists between Claude sessions
+- Stored in `~/.n8n_workflow_builder_state.json`
+
+## ✅ Workflow Validation Deep Dive
+
+For detailed information about the validation system, see:
+- **[Validation Documentation](docs/VALIDATION.md)** - Complete validation guide
+
+**Quick summary:**
+- 3-layer validation: Schema, Semantics, Parameters
+- 30+ validation rules
+- Security checks (credentials, authentication, SQL injection)
+- Node-specific parameter validation
+- Comprehensive error/warning reports
+- Validates before deployment
 
 ## 🔄 Updates & Extensions
 

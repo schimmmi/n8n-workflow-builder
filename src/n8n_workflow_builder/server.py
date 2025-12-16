@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -18,6 +19,9 @@ from mcp.types import Tool, TextContent
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("n8n-workflow-builder")
+
+# State file location
+STATE_FILE = Path.home() / ".n8n_workflow_builder_state.json"
 
 # n8n Node Knowledge Base - The most common and useful nodes
 NODE_KNOWLEDGE = {
@@ -159,6 +163,146 @@ WORKFLOW_TEMPLATES = {
         "connections": "conditional"
     }
 }
+
+
+class StateManager:
+    """Manages persistent state and context for workflow operations"""
+
+    def __init__(self, state_file: Path = STATE_FILE):
+        self.state_file = state_file
+        self.state = self._load_state()
+
+    def _load_state(self) -> Dict:
+        """Load state from file"""
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning(f"Could not load state file: {e}")
+                return self._default_state()
+        return self._default_state()
+
+    def _default_state(self) -> Dict:
+        """Get default state structure"""
+        return {
+            "current_workflow_id": None,
+            "current_workflow_name": None,
+            "last_execution_id": None,
+            "recent_workflows": [],
+            "session_history": [],
+            "created_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat()
+        }
+
+    def _save_state(self):
+        """Save state to file"""
+        try:
+            self.state["last_updated"] = datetime.now().isoformat()
+            with open(self.state_file, 'w') as f:
+                json.dump(self.state, f, indent=2)
+        except Exception as e:
+            logger.error(f"Could not save state file: {e}")
+
+    def set_current_workflow(self, workflow_id: str, workflow_name: str):
+        """Set the current active workflow"""
+        self.state["current_workflow_id"] = workflow_id
+        self.state["current_workflow_name"] = workflow_name
+
+        # Update recent workflows (keep last 10)
+        workflow_entry = {
+            "id": workflow_id,
+            "name": workflow_name,
+            "accessed_at": datetime.now().isoformat()
+        }
+
+        # Remove if already in list
+        self.state["recent_workflows"] = [
+            w for w in self.state["recent_workflows"]
+            if w["id"] != workflow_id
+        ]
+
+        # Add to front
+        self.state["recent_workflows"].insert(0, workflow_entry)
+        self.state["recent_workflows"] = self.state["recent_workflows"][:10]
+
+        self._save_state()
+        logger.info(f"Set current workflow: {workflow_name} ({workflow_id})")
+
+    def get_current_workflow(self) -> Optional[Dict]:
+        """Get current workflow info"""
+        if self.state["current_workflow_id"]:
+            return {
+                "id": self.state["current_workflow_id"],
+                "name": self.state["current_workflow_name"]
+            }
+        return None
+
+    def set_last_execution(self, execution_id: str):
+        """Record last execution"""
+        self.state["last_execution_id"] = execution_id
+        self._save_state()
+
+    def get_last_execution(self) -> Optional[str]:
+        """Get last execution ID"""
+        return self.state.get("last_execution_id")
+
+    def log_action(self, action: str, details: Dict = None):
+        """Log an action to session history"""
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action": action,
+            "details": details or {}
+        }
+
+        self.state["session_history"].append(entry)
+
+        # Keep last 50 entries
+        self.state["session_history"] = self.state["session_history"][-50:]
+
+        self._save_state()
+
+    def get_session_history(self, limit: int = 10) -> List[Dict]:
+        """Get recent session history"""
+        return self.state["session_history"][-limit:]
+
+    def get_recent_workflows(self) -> List[Dict]:
+        """Get recently accessed workflows"""
+        return self.state["recent_workflows"]
+
+    def clear_state(self):
+        """Clear all state"""
+        self.state = self._default_state()
+        self._save_state()
+        logger.info("State cleared")
+
+    def get_state_summary(self) -> str:
+        """Get a formatted summary of current state"""
+        summary = "# Current Session State\n\n"
+
+        current = self.get_current_workflow()
+        if current:
+            summary += f"**Active Workflow:** {current['name']} (`{current['id']}`)\n\n"
+        else:
+            summary += "**Active Workflow:** None\n\n"
+
+        if self.state.get("last_execution_id"):
+            summary += f"**Last Execution:** `{self.state['last_execution_id']}`\n\n"
+
+        recent = self.get_recent_workflows()
+        if recent:
+            summary += "## Recent Workflows:\n\n"
+            for wf in recent[:5]:
+                summary += f"- {wf['name']} (`{wf['id']}`) - {wf['accessed_at']}\n"
+            summary += "\n"
+
+        history = self.get_session_history(5)
+        if history:
+            summary += "## Recent Actions:\n\n"
+            for entry in reversed(history):
+                summary += f"- **{entry['timestamp']}** - {entry['action']}\n"
+
+        return summary
 
 
 class N8nClient:
@@ -349,9 +493,251 @@ class N8nClient:
         await self.client.aclose()
 
 
+class WorkflowValidator:
+    """Validates workflows before deployment"""
+
+    # Required fields for workflow schema
+    REQUIRED_WORKFLOW_FIELDS = ['name', 'nodes', 'connections']
+    REQUIRED_NODE_FIELDS = ['name', 'type', 'position', 'parameters']
+
+    # Node type patterns for validation
+    TRIGGER_NODE_TYPES = ['n8n-nodes-base.webhook', 'n8n-nodes-base.scheduleTrigger', 'n8n-nodes-base.manualTrigger']
+
+    @staticmethod
+    def validate_workflow_schema(workflow: Dict) -> Dict[str, List[str]]:
+        """Validate workflow schema structure
+
+        Returns:
+            Dict with 'errors' and 'warnings' lists
+        """
+        errors = []
+        warnings = []
+
+        # Check required workflow fields
+        for field in WorkflowValidator.REQUIRED_WORKFLOW_FIELDS:
+            if field not in workflow:
+                errors.append(f"Missing required field: '{field}'")
+
+        # Check if workflow has a name
+        if 'name' in workflow:
+            if not workflow['name'] or not workflow['name'].strip():
+                errors.append("Workflow name cannot be empty")
+            elif len(workflow['name']) > 200:
+                warnings.append("Workflow name is very long (>200 chars)")
+
+        # Validate nodes
+        nodes = workflow.get('nodes', [])
+        if not isinstance(nodes, list):
+            errors.append("'nodes' must be a list")
+        else:
+            if len(nodes) == 0:
+                errors.append("Workflow has no nodes")
+
+            for idx, node in enumerate(nodes):
+                if not isinstance(node, dict):
+                    errors.append(f"Node at index {idx} is not a dictionary")
+                    continue
+
+                # Check required node fields
+                for field in WorkflowValidator.REQUIRED_NODE_FIELDS:
+                    if field not in node:
+                        errors.append(f"Node '{node.get('name', f'at index {idx}')}': Missing required field '{field}'")
+
+                # Validate node name
+                if 'name' in node:
+                    if not node['name'] or not node['name'].strip():
+                        errors.append(f"Node at index {idx}: Name cannot be empty")
+
+                # Validate node type
+                if 'type' in node:
+                    if not node['type'] or not node['type'].strip():
+                        errors.append(f"Node '{node.get('name')}': Type cannot be empty")
+
+                # Validate position
+                if 'position' in node:
+                    if not isinstance(node['position'], list) or len(node['position']) != 2:
+                        errors.append(f"Node '{node.get('name')}': Position must be [x, y] array")
+
+        # Validate connections
+        connections = workflow.get('connections', {})
+        if not isinstance(connections, dict):
+            errors.append("'connections' must be a dictionary")
+
+        return {'errors': errors, 'warnings': warnings}
+
+    @staticmethod
+    def validate_workflow_semantics(workflow: Dict) -> Dict[str, List[str]]:
+        """Validate semantic rules (logic, best practices)
+
+        Returns:
+            Dict with 'errors' and 'warnings' lists
+        """
+        errors = []
+        warnings = []
+        nodes = workflow.get('nodes', [])
+        connections = workflow.get('connections', {})
+
+        # Check for at least one trigger node
+        trigger_nodes = [n for n in nodes if n.get('type') in WorkflowValidator.TRIGGER_NODE_TYPES]
+        if not trigger_nodes:
+            errors.append("Workflow must have at least one trigger node (Webhook, Schedule, or Manual)")
+
+        # Check for duplicate node names
+        node_names = [n.get('name') for n in nodes if n.get('name')]
+        duplicate_names = [name for name in node_names if node_names.count(name) > 1]
+        if duplicate_names:
+            errors.append(f"Duplicate node names found: {', '.join(set(duplicate_names))}")
+
+        # Check for orphaned nodes (nodes without connections)
+        if len(nodes) > 1:
+            connected_nodes = set()
+            for source_name, targets in connections.items():
+                connected_nodes.add(source_name)
+                if isinstance(targets, dict):
+                    for target_list in targets.values():
+                        if isinstance(target_list, list):
+                            for target in target_list:
+                                if isinstance(target, dict):
+                                    connected_nodes.add(target.get('node'))
+
+            orphaned = [n['name'] for n in nodes if n.get('name') and n['name'] not in connected_nodes and n.get('type') not in WorkflowValidator.TRIGGER_NODE_TYPES]
+            if orphaned:
+                warnings.append(f"Orphaned nodes (no connections): {', '.join(orphaned)}")
+
+        # Check for default node names (bad practice)
+        default_names = ['Webhook', 'HTTP Request', 'Set', 'IF', 'Function', 'Code']
+        unnamed_nodes = [n['name'] for n in nodes if n.get('name') in default_names]
+        if unnamed_nodes:
+            warnings.append(f"Nodes with default names (should be renamed): {', '.join(set(unnamed_nodes))}")
+
+        # Check for missing credentials in nodes that require them
+        credential_nodes = ['n8n-nodes-base.httpRequest', 'n8n-nodes-base.postgres', 'n8n-nodes-base.redis']
+        for node in nodes:
+            if node.get('type') in credential_nodes:
+                if not node.get('credentials') or len(node.get('credentials', {})) == 0:
+                    warnings.append(f"Node '{node.get('name')}' may need credentials configured")
+
+        # Check for hardcoded sensitive data
+        for node in nodes:
+            node_str = json.dumps(node.get('parameters', {}))
+            if any(keyword in node_str.lower() for keyword in ['password', 'apikey', 'api_key', 'secret', 'token']) and '{{' not in node_str:
+                warnings.append(f"Node '{node.get('name')}' may contain hardcoded sensitive data")
+
+        # Check workflow complexity
+        if len(nodes) > 30:
+            warnings.append(f"Workflow is complex ({len(nodes)} nodes). Consider splitting into sub-workflows.")
+
+        # Check for missing error handling
+        error_trigger = any(n.get('type') == 'n8n-nodes-base.errorTrigger' for n in nodes)
+        if len(nodes) > 5 and not error_trigger:
+            warnings.append("Workflow lacks error handling (Error Trigger node)")
+
+        return {'errors': errors, 'warnings': warnings}
+
+    @staticmethod
+    def validate_node_parameters(workflow: Dict) -> Dict[str, List[str]]:
+        """Validate node-specific parameter requirements
+
+        Returns:
+            Dict with 'errors' and 'warnings' lists
+        """
+        errors = []
+        warnings = []
+        nodes = workflow.get('nodes', [])
+
+        for node in nodes:
+            node_type = node.get('type', '')
+            node_name = node.get('name', 'Unknown')
+            params = node.get('parameters', {})
+
+            # Webhook node validation
+            if node_type == 'n8n-nodes-base.webhook':
+                if not params.get('path'):
+                    errors.append(f"Webhook node '{node_name}': Missing 'path' parameter")
+
+                auth_method = params.get('authentication')
+                if not auth_method or auth_method == 'none':
+                    warnings.append(f"Webhook node '{node_name}': No authentication enabled (security risk)")
+
+            # HTTP Request node validation
+            elif node_type == 'n8n-nodes-base.httpRequest':
+                if not params.get('url'):
+                    errors.append(f"HTTP Request node '{node_name}': Missing 'url' parameter")
+
+                if not params.get('timeout'):
+                    warnings.append(f"HTTP Request node '{node_name}': No timeout set (may hang)")
+
+            # Schedule Trigger validation
+            elif node_type == 'n8n-nodes-base.scheduleTrigger':
+                if not params.get('rule') and not params.get('cronExpression'):
+                    errors.append(f"Schedule Trigger node '{node_name}': Missing schedule configuration")
+
+            # IF node validation
+            elif node_type == 'n8n-nodes-base.if':
+                conditions = params.get('conditions', {})
+                if not conditions or len(conditions.get('boolean', [])) == 0:
+                    warnings.append(f"IF node '{node_name}': No conditions defined")
+
+            # Postgres node validation
+            elif node_type == 'n8n-nodes-base.postgres':
+                operation = params.get('operation')
+                if operation in ['executeQuery', 'insert', 'update', 'delete']:
+                    query = params.get('query', '')
+                    if 'SELECT *' in query.upper():
+                        warnings.append(f"Postgres node '{node_name}': Using SELECT * (bad practice)")
+                    if operation != 'executeQuery' and '{{' not in query:
+                        warnings.append(f"Postgres node '{node_name}': Query should use parameterized values")
+
+            # Set node validation
+            elif node_type == 'n8n-nodes-base.set':
+                if not params.get('values'):
+                    warnings.append(f"Set node '{node_name}': No values configured")
+
+            # Code node validation
+            elif node_type == 'n8n-nodes-base.code':
+                code = params.get('jsCode', '')
+                if not code or len(code.strip()) == 0:
+                    errors.append(f"Code node '{node_name}': No code defined")
+
+                # Check for common mistakes
+                if 'return items' not in code and 'return [{' not in code:
+                    warnings.append(f"Code node '{node_name}': Should return items array")
+
+        return {'errors': errors, 'warnings': warnings}
+
+    @classmethod
+    def validate_workflow_full(cls, workflow: Dict) -> Dict:
+        """Run all validations and combine results
+
+        Returns:
+            Dict with 'valid', 'errors', 'warnings', and 'summary'
+        """
+        schema_result = cls.validate_workflow_schema(workflow)
+        semantic_result = cls.validate_workflow_semantics(workflow)
+        param_result = cls.validate_node_parameters(workflow)
+
+        all_errors = schema_result['errors'] + semantic_result['errors'] + param_result['errors']
+        all_warnings = schema_result['warnings'] + semantic_result['warnings'] + param_result['warnings']
+
+        is_valid = len(all_errors) == 0
+
+        return {
+            'valid': is_valid,
+            'errors': all_errors,
+            'warnings': all_warnings,
+            'summary': {
+                'total_errors': len(all_errors),
+                'total_warnings': len(all_warnings),
+                'schema_errors': len(schema_result['errors']),
+                'semantic_errors': len(semantic_result['errors']),
+                'parameter_errors': len(param_result['errors'])
+            }
+        }
+
+
 class WorkflowBuilder:
     """AI-powered workflow builder"""
-    
+
     @staticmethod
     def suggest_nodes(description: str) -> List[Dict]:
         """Suggest nodes based on workflow description"""
@@ -460,10 +846,12 @@ class WorkflowBuilder:
 
 def create_n8n_server(api_url: str, api_key: str) -> Server:
     """Create the n8n workflow builder MCP server"""
-    
+
     server = Server("n8n-workflow-builder")
     n8n_client = N8nClient(api_url, api_key)
     workflow_builder = WorkflowBuilder()
+    workflow_validator = WorkflowValidator()
+    state_manager = StateManager()
     
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -696,6 +1084,122 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     },
                     "required": ["workflow_id"]
                 }
+            ),
+            Tool(
+                name="get_session_state",
+                description=(
+                    "🔄 Get current session state and context. "
+                    "Shows the currently active workflow, recent workflows, and action history. "
+                    "Use this to understand what you were working on."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="set_active_workflow",
+                description=(
+                    "📌 Set a workflow as the active/current workflow for the session. "
+                    "This allows you to reference it later with 'current workflow' instead of IDs."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to set as active"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="get_active_workflow",
+                description=(
+                    "📍 Get the currently active workflow that was set via set_active_workflow. "
+                    "Returns ID and name of the active workflow."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="get_recent_workflows",
+                description=(
+                    "📜 Get a list of recently accessed workflows. "
+                    "Shows the last 10 workflows you worked with, ordered by most recent."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="get_session_history",
+                description=(
+                    "📝 Get recent action history for this session. "
+                    "Shows what operations were performed recently."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "number",
+                            "description": "Number of history entries to return (default: 10)",
+                            "default": 10
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="clear_session_state",
+                description=(
+                    "🗑️ Clear all session state and history. "
+                    "Resets the active workflow, recent workflows, and action history."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="validate_workflow",
+                description=(
+                    "✅ Validate a workflow before deployment. "
+                    "Performs comprehensive validation: schema checks, semantic rules, "
+                    "node parameter validation, security checks, and best practices. "
+                    "Returns detailed errors and warnings."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to validate"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="validate_workflow_json",
+                description=(
+                    "✅ Validate a workflow from JSON structure. "
+                    "Use this to validate a workflow before creating it. "
+                    "Accepts raw workflow JSON and returns validation results."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow": {
+                            "type": "object",
+                            "description": "Workflow JSON object with nodes, connections, etc."
+                        }
+                    },
+                    "required": ["workflow"]
+                }
             )
         ]
     
@@ -739,25 +1243,29 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 workflow_id = arguments["workflow_id"]
                 workflow = await n8n_client.get_workflow(workflow_id)
                 analysis = workflow_builder.analyze_workflow(workflow)
-                
+
+                # Set as current and log
+                state_manager.set_current_workflow(workflow['id'], workflow['name'])
+                state_manager.log_action("analyze_workflow", {"workflow_id": workflow_id, "complexity": analysis['complexity']})
+
                 result = f"# Workflow Analysis: {workflow.get('name', workflow_id)}\n\n"
                 result += f"**Complexity:** {analysis['complexity']}\n"
                 result += f"**Total Nodes:** {analysis['total_nodes']}\n\n"
-                
+
                 if analysis['issues']:
                     result += "## ⚠️ Issues Found:\n\n"
                     for issue in analysis['issues']:
                         result += f"- {issue}\n"
                     result += "\n"
-                
+
                 if analysis['suggestions']:
                     result += "## 💡 Suggestions:\n\n"
                     for suggestion in analysis['suggestions']:
                         result += f"- {suggestion}\n"
-                
+
                 if not analysis['issues'] and not analysis['suggestions']:
                     result += "✅ Workflow looks good! No major issues found.\n"
-                
+
                 return [TextContent(type="text", text=result)]
             
             elif name == "list_workflows":
@@ -777,29 +1285,38 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             elif name == "get_workflow_details":
                 workflow_id = arguments["workflow_id"]
                 workflow = await n8n_client.get_workflow(workflow_id)
-                
+
+                # Set as current workflow and log action
+                state_manager.set_current_workflow(workflow['id'], workflow['name'])
+                state_manager.log_action("get_workflow_details", {"workflow_id": workflow_id, "workflow_name": workflow['name']})
+
                 result = f"# Workflow: {workflow['name']}\n\n"
                 result += f"**ID:** {workflow['id']}\n"
                 result += f"**Active:** {'Yes' if workflow.get('active') else 'No'}\n"
                 result += f"**Nodes:** {len(workflow.get('nodes', []))}\n\n"
-                
+
                 result += "## Nodes:\n\n"
                 for node in workflow.get('nodes', []):
                     result += f"- **{node['name']}** ({node['type']})\n"
-                
+
                 return [TextContent(type="text", text=result)]
             
             elif name == "execute_workflow":
                 workflow_id = arguments["workflow_id"]
                 input_data = arguments.get("input_data")
-                
+
                 execution = await n8n_client.execute_workflow(workflow_id, input_data)
-                
+
+                # Log execution
+                execution_id = execution.get('id', 'N/A')
+                state_manager.set_last_execution(execution_id)
+                state_manager.log_action("execute_workflow", {"workflow_id": workflow_id, "execution_id": execution_id})
+
                 result = f"# Workflow Execution\n\n"
-                result += f"**Execution ID:** {execution.get('id', 'N/A')}\n"
+                result += f"**Execution ID:** {execution_id}\n"
                 result += f"**Status:** {execution.get('finished', 'Running')}\n"
                 result += f"**Data:** {json.dumps(execution.get('data', {}), indent=2)}\n"
-                
+
                 return [TextContent(type="text", text=result)]
             
             elif name == "get_executions":
@@ -984,6 +1501,193 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         result += f"- **{key}:** {'Enabled' if value else 'Disabled'}\n"
                     else:
                         result += f"- **{key}:** {value}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_session_state":
+                result = state_manager.get_state_summary()
+                return [TextContent(type="text", text=result)]
+
+            elif name == "set_active_workflow":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow to get its name
+                workflow = await n8n_client.get_workflow(workflow_id)
+                state_manager.set_current_workflow(workflow['id'], workflow['name'])
+                state_manager.log_action("set_active_workflow", {"workflow_id": workflow_id, "workflow_name": workflow['name']})
+
+                result = f"✅ Set active workflow: **{workflow['name']}** (`{workflow['id']}`)\n\n"
+                result += "You can now reference this workflow as the 'current workflow' in future prompts."
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_active_workflow":
+                current = state_manager.get_current_workflow()
+
+                if not current:
+                    return [TextContent(
+                        type="text",
+                        text="No active workflow set. Use `set_active_workflow` to set one."
+                    )]
+
+                result = f"# Active Workflow\n\n"
+                result += f"**Name:** {current['name']}\n"
+                result += f"**ID:** `{current['id']}`\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_recent_workflows":
+                recent = state_manager.get_recent_workflows()
+
+                if not recent:
+                    return [TextContent(
+                        type="text",
+                        text="No recent workflows. Start working with workflows to see them here."
+                    )]
+
+                result = f"# Recent Workflows ({len(recent)})\n\n"
+                for wf in recent:
+                    result += f"- **{wf['name']}** (`{wf['id']}`)\n"
+                    result += f"  Last accessed: {wf['accessed_at']}\n\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_session_history":
+                limit = arguments.get("limit", 10)
+                history = state_manager.get_session_history(limit)
+
+                if not history:
+                    return [TextContent(
+                        type="text",
+                        text="No session history yet. Actions will be logged here as you use the tools."
+                    )]
+
+                result = f"# Session History (Last {len(history)} actions)\n\n"
+                for entry in reversed(history):
+                    result += f"**{entry['timestamp']}**\n"
+                    result += f"- Action: `{entry['action']}`\n"
+                    if entry.get('details'):
+                        details_str = ", ".join([f"{k}={v}" for k, v in entry['details'].items()])
+                        result += f"- Details: {details_str}\n"
+                    result += "\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "clear_session_state":
+                state_manager.clear_state()
+
+                result = "✅ Session state cleared!\n\n"
+                result += "All context has been reset:\n"
+                result += "- Active workflow: None\n"
+                result += "- Recent workflows: Cleared\n"
+                result += "- Session history: Cleared\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "validate_workflow":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Run validation
+                validation_result = workflow_validator.validate_workflow_full(workflow)
+
+                # Log action
+                state_manager.log_action("validate_workflow", {
+                    "workflow_id": workflow_id,
+                    "valid": validation_result['valid'],
+                    "errors": validation_result['summary']['total_errors'],
+                    "warnings": validation_result['summary']['total_warnings']
+                })
+
+                # Format result
+                result = f"# Workflow Validation: {workflow['name']}\n\n"
+
+                if validation_result['valid']:
+                    result += "## ✅ Validation Passed\n\n"
+                    result += f"**Status:** Ready for deployment\n"
+                    result += f"**Total Warnings:** {validation_result['summary']['total_warnings']}\n\n"
+                else:
+                    result += "## ❌ Validation Failed\n\n"
+                    result += f"**Status:** Cannot deploy - fix errors first\n"
+                    result += f"**Total Errors:** {validation_result['summary']['total_errors']}\n"
+                    result += f"**Total Warnings:** {validation_result['summary']['total_warnings']}\n\n"
+
+                # Show summary breakdown
+                result += "### Validation Summary:\n\n"
+                result += f"- Schema errors: {validation_result['summary']['schema_errors']}\n"
+                result += f"- Semantic errors: {validation_result['summary']['semantic_errors']}\n"
+                result += f"- Parameter errors: {validation_result['summary']['parameter_errors']}\n\n"
+
+                # Show errors
+                if validation_result['errors']:
+                    result += "## 🔴 Errors (must fix):\n\n"
+                    for idx, error in enumerate(validation_result['errors'], 1):
+                        result += f"{idx}. {error}\n"
+                    result += "\n"
+
+                # Show warnings
+                if validation_result['warnings']:
+                    result += "## ⚠️ Warnings (should fix):\n\n"
+                    for idx, warning in enumerate(validation_result['warnings'], 1):
+                        result += f"{idx}. {warning}\n"
+                    result += "\n"
+
+                if validation_result['valid'] and not validation_result['warnings']:
+                    result += "🎉 Perfect! No errors or warnings found.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "validate_workflow_json":
+                workflow = arguments["workflow"]
+
+                # Run validation
+                validation_result = workflow_validator.validate_workflow_full(workflow)
+
+                # Log action
+                state_manager.log_action("validate_workflow_json", {
+                    "workflow_name": workflow.get('name', 'Unknown'),
+                    "valid": validation_result['valid'],
+                    "errors": validation_result['summary']['total_errors'],
+                    "warnings": validation_result['summary']['total_warnings']
+                })
+
+                # Format result
+                result = f"# Workflow Validation: {workflow.get('name', 'Unnamed')}\n\n"
+
+                if validation_result['valid']:
+                    result += "## ✅ Validation Passed\n\n"
+                    result += f"**Status:** Safe to create/deploy\n"
+                    result += f"**Total Warnings:** {validation_result['summary']['total_warnings']}\n\n"
+                else:
+                    result += "## ❌ Validation Failed\n\n"
+                    result += f"**Status:** Fix errors before creating workflow\n"
+                    result += f"**Total Errors:** {validation_result['summary']['total_errors']}\n"
+                    result += f"**Total Warnings:** {validation_result['summary']['total_warnings']}\n\n"
+
+                # Show summary breakdown
+                result += "### Validation Summary:\n\n"
+                result += f"- Schema errors: {validation_result['summary']['schema_errors']}\n"
+                result += f"- Semantic errors: {validation_result['summary']['semantic_errors']}\n"
+                result += f"- Parameter errors: {validation_result['summary']['parameter_errors']}\n\n"
+
+                # Show errors
+                if validation_result['errors']:
+                    result += "## 🔴 Errors (must fix):\n\n"
+                    for idx, error in enumerate(validation_result['errors'], 1):
+                        result += f"{idx}. {error}\n"
+                    result += "\n"
+
+                # Show warnings
+                if validation_result['warnings']:
+                    result += "## ⚠️ Warnings (should fix):\n\n"
+                    for idx, warning in enumerate(validation_result['warnings'], 1):
+                        result += f"{idx}. {warning}\n"
+                    result += "\n"
+
+                if validation_result['valid'] and not validation_result['warnings']:
+                    result += "🎉 Perfect! No errors or warnings found.\n"
 
                 return [TextContent(type="text", text=result)]
 

@@ -1,0 +1,214 @@
+{
+  "workflow": {
+    "name": "Example API Endpoint",
+    "nodes": [
+      {
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [100, 200],
+        "parameters": {
+          "path": "api/users",
+          "authentication": "none"
+        }
+      },
+      {
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [300, 200],
+        "parameters": {}
+      },
+      {
+        "name": "Set",
+        "type": "n8n-nodes-base.set",
+        "position": [500, 200],
+        "parameters": {
+          "values": {}
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Set",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "validation_result": {
+    "valid": false,
+    "errors": [
+      "Node 'HTTP Request': Missing 'url' parameter"
+    ],
+    "warnings": [
+      "Webhook node 'Webhook': No authentication enabled (security risk)",
+      "Nodes with default names (should be renamed): Webhook, HTTP Request, Set",
+      "HTTP Request node 'HTTP Request': No timeout set (may hang)"
+    ],
+    "summary": {
+      "total_errors": 1,
+      "total_warnings": 3,
+      "schema_errors": 0,
+      "semantic_errors": 0,
+      "parameter_errors": 1
+    }
+  },
+  "fixes_to_apply": {
+    "errors": [
+      {
+        "issue": "Missing 'url' parameter in HTTP Request node",
+        "fix": "Add url parameter",
+        "example": {
+          "parameters": {
+            "url": "https://api.example.com/data"
+          }
+        }
+      }
+    ],
+    "warnings": [
+      {
+        "issue": "No authentication on Webhook",
+        "fix": "Enable authentication",
+        "example": {
+          "parameters": {
+            "authentication": "headerAuth",
+            "headerAuth": "={{$credentials.apiAuth}}"
+          }
+        }
+      },
+      {
+        "issue": "Default node names",
+        "fix": "Rename nodes to describe their purpose",
+        "example": {
+          "nodes": [
+            {"old_name": "Webhook", "new_name": "Receive User Request"},
+            {"old_name": "HTTP Request", "new_name": "Fetch User Data"},
+            {"old_name": "Set", "new_name": "Format Response"}
+          ]
+        }
+      },
+      {
+        "issue": "No timeout on HTTP Request",
+        "fix": "Add timeout parameter",
+        "example": {
+          "parameters": {
+            "timeout": 30000
+          }
+        }
+      }
+    ]
+  },
+  "workflow_after_fixes": {
+    "name": "User API Endpoint",
+    "nodes": [
+      {
+        "name": "Receive User Request",
+        "type": "n8n-nodes-base.webhook",
+        "position": [100, 200],
+        "parameters": {
+          "path": "api/users",
+          "authentication": "headerAuth",
+          "headerAuth": "={{$credentials.apiAuth}}"
+        }
+      },
+      {
+        "name": "Fetch User Data",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [300, 200],
+        "parameters": {
+          "url": "https://api.example.com/users",
+          "timeout": 30000
+        }
+      },
+      {
+        "name": "Format Response",
+        "type": "n8n-nodes-base.set",
+        "position": [500, 200],
+        "parameters": {
+          "values": {
+            "string": [
+              {
+                "name": "userId",
+                "value": "={{$json.id}}"
+              },
+              {
+                "name": "userName",
+                "value": "={{$json.name}}"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [700, 200],
+        "parameters": {}
+      }
+    ],
+    "connections": {
+      "Receive User Request": {
+        "main": [
+          [
+            {
+              "node": "Fetch User Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch User Data": {
+        "main": [
+          [
+            {
+              "node": "Format Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Response": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "validation_result_after_fixes": {
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "summary": {
+      "total_errors": 0,
+      "total_warnings": 0,
+      "schema_errors": 0,
+      "semantic_errors": 0,
+      "parameter_errors": 0
+    },
+    "message": "🎉 Perfect! No errors or warnings found."
+  }
+}
