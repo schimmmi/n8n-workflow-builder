@@ -42,6 +42,14 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Security Checks**: Detects hardcoded credentials, missing authentication
 - **Best Practices**: Warns about default names, missing error handling, complexity
 
+### 🤖 AI Feedback & Error Analysis
+- **Intelligent Error Analysis**: Analyzes failed executions and identifies root causes
+- **Pattern Recognition**: Detects common failure types (auth, network, data, SQL, rate limiting)
+- **AI-Friendly Feedback**: Structured guidance for AI agents generating workflows
+- **Fix Examples**: Wrong vs. Correct code comparisons
+- **Improvement Suggestions**: Node-specific recommendations for fixing failures
+- **Learning Loop**: AI agents learn from errors and generate better workflows
+
 ### 📚 Knowledge Base
 - **Node Encyclopedia**: Detailed explanations of all important n8n nodes
 - **Use Cases & Examples**: Practical examples for each node type
@@ -333,6 +341,42 @@ Claude uses: validate_workflow_json
 → Validates structure before workflow creation
 ```
 
+### AI Error Analysis & Feedback
+```
+You: "My workflow failed with execution 12345, what went wrong?"
+
+Claude uses: analyze_execution_errors
+→ AI-friendly error analysis with root cause and fixes
+```
+
+**Example Output:**
+```
+🔍 Execution Error Analysis: API Data Sync
+
+❌ Status: Execution failed
+🎯 Root Cause: Authentication/Authorization Error
+
+🔴 Errors Detected:
+1. Node: `Fetch User Data` - 401 Unauthorized
+
+🤖 AI Guidance:
+When generating workflows, ensure:
+1. Use credential references: {{$credentials.name}} not hardcoded values
+2. Specify correct authentication type (Bearer, Basic, OAuth)
+3. Test credentials before deploying
+
+📝 Fix Examples:
+❌ Wrong: "apiKey": "sk-abc123"
+✅ Correct: "authentication": "predefinedCredentialType"
+```
+
+```
+You: "Get improvement suggestions for failed workflow"
+
+Claude uses: get_workflow_improvement_suggestions
+→ Node-specific fix recommendations
+```
+
 ## 🧠 Knowledge Base
 
 The server knows these node categories:
@@ -478,6 +522,19 @@ For detailed information about the validation system, see:
 - Node-specific parameter validation
 - Comprehensive error/warning reports
 - Validates before deployment
+
+## 🤖 AI Feedback Deep Dive
+
+For detailed information about the AI feedback system, see:
+- **[AI Feedback Documentation](docs/AI_FEEDBACK.md)** - Complete AI feedback guide
+
+**Quick summary:**
+- Intelligent error pattern recognition
+- Root cause identification (6+ error types)
+- AI-friendly structured feedback
+- Fix examples (wrong vs. correct)
+- Workflow improvement suggestions
+- Learning loop for AI agents
 
 ## 🔄 Updates & Extensions
 
