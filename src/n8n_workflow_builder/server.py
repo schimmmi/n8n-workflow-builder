@@ -49,6 +49,13 @@ from .changes import (
     ApprovalWorkflow,
     ChangeFormatter
 )
+from .templates import (
+    TemplateRegistry,
+    TemplateIntentExtractor,
+    TemplateMatcher,
+    TemplateAdapter,
+    ProvenanceTracker
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +76,11 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     template_engine = TemplateRecommendationEngine()
     intent_manager = IntentManager()
     approval_workflow = ApprovalWorkflow()
+
+    # Template System v2.0
+    template_registry = TemplateRegistry()
+    template_adapter = TemplateAdapter()
+    provenance_tracker = ProvenanceTracker()
     
 
     @server.list_tools()
@@ -1008,6 +1020,65 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         "workflow_id":{"type":"string","description":"Workflow ID"}
                     },
                     "required":["workflow_id"]
+                }
+            ),
+            Tool(
+                name="find_templates_by_intent",
+                description="🎯 Smart template matching: Describe your goal → get template suggestions with match explanation. Uses intent-based semantic matching.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "description":{"type":"string","description":"Natural language description of what you want to build"},
+                        "top_k":{"type":"integer","description":"Number of suggestions (default: 5)","default":5}
+                    },
+                    "required":["description"]
+                }
+            ),
+            Tool(
+                name="extract_template_intent",
+                description="🧠 Extract template intent: purpose, assumptions, risks, data flow, external systems. Makes templates 'thinkable'.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "template_id":{"type":"string","description":"Template ID"}
+                    },
+                    "required":["template_id"]
+                }
+            ),
+            Tool(
+                name="adapt_template",
+                description="🔧 Adapt template for production: replace placeholders, abstract credentials, modernize deprecated nodes, add error handling.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "template_id":{"type":"string","description":"Template ID"},
+                        "replacements":{"type":"object","description":"Placeholder replacements {\"API_URL\": \"https://...\"}"},
+                        "add_error_handling":{"type":"boolean","description":"Add error handling (default: true)","default":True},
+                        "modernize_nodes":{"type":"boolean","description":"Replace deprecated nodes (default: true)","default":True}
+                    },
+                    "required":["template_id"]
+                }
+            ),
+            Tool(
+                name="get_template_provenance",
+                description="📊 Get template provenance: source, author, success rate, usage stats, trust score. Shows template reliability.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "template_id":{"type":"string","description":"Template ID"}
+                    },
+                    "required":["template_id"]
+                }
+            ),
+            Tool(
+                name="get_template_requirements",
+                description="📋 Get template requirements: placeholders to fill, credentials needed, external systems. Pre-deployment checklist.",
+                inputSchema={
+                    "type":"object",
+                    "properties":{
+                        "template_id":{"type":"string","description":"Template ID"}
+                    },
+                    "required":["template_id"]
                 }
             )
         ]
@@ -3204,6 +3275,280 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         result += f"- **Comments**: {req['review_comments']}\n"
 
                     result += "\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "find_templates_by_intent":
+                description = arguments["description"]
+                top_k = arguments.get("top_k", 5)
+
+                # Fetch all templates
+                all_templates = await template_registry.fetch_all_templates()
+
+                # Create matcher and find matches
+                matcher = TemplateMatcher(all_templates)
+                matches = matcher.match(description, top_k=top_k)
+
+                # Format results
+                result = f"# Template Suggestions for: \"{description}\"\n\n"
+                result += f"Found {len(matches)} matches:\n\n"
+
+                for i, (template, score, reason) in enumerate(matches, 1):
+                    result += f"## {i}. {template.name} ({int(score * 100)}% match)\n\n"
+                    result += f"**Why**: {reason}\n\n"
+
+                    # Template details
+                    result += f"- **Category**: {template.category}\n"
+                    result += f"- **Complexity**: {template.complexity}\n"
+                    result += f"- **Source**: {template.source}\n"
+
+                    if template.trigger_type:
+                        result += f"- **Trigger**: {template.trigger_type}\n"
+
+                    if template.data_flow:
+                        result += f"- **Data Flow**: {template.data_flow}\n"
+
+                    if template.external_systems:
+                        result += f"- **External Systems**: {', '.join(template.external_systems[:3])}\n"
+
+                    result += f"- **Node Count**: {template.node_count}\n"
+                    result += f"- **Setup Time**: ~{template.estimated_setup_time}\n"
+
+                    if template.description:
+                        result += f"\n**Description**: {template.description}\n"
+
+                    result += "\n"
+
+                    # Track usage
+                    provenance_tracker.record_usage(template.id)
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "extract_template_intent":
+                template_id = arguments["template_id"]
+
+                # Get template
+                template = await template_registry.get_template(template_id)
+
+                if not template:
+                    # Try from old template engine
+                    from .templates.recommender import WORKFLOW_TEMPLATES
+                    if template_id in WORKFLOW_TEMPLATES:
+                        template_dict = WORKFLOW_TEMPLATES[template_id]
+                        from .templates.sources.base import TemplateMetadata
+                        template = TemplateMetadata(
+                            id=template_id,
+                            source="n8n_official",
+                            name=template_dict["name"],
+                            description=template_dict["description"],
+                            category=template_dict["category"],
+                            tags=template_dict["tags"],
+                            n8n_version=">=1.0",
+                            template_version="1.0.0",
+                            nodes=template_dict["nodes"],
+                            connections={},
+                            settings={},
+                            complexity=template_dict["complexity"],
+                            node_count=len(template_dict["nodes"]),
+                            estimated_setup_time=template_dict["estimated_time"]
+                        )
+
+                if not template:
+                    return [TextContent(type="text", text=f"Template {template_id} not found")]
+
+                # Extract intent
+                intent_data = TemplateIntentExtractor.extract_intent(template)
+
+                # Format result
+                result = f"# Template Intent Analysis: {template.name}\n\n"
+
+                result += f"## 🎯 Purpose\n{intent_data['intent']}\n\n"
+
+                result += f"## 📋 Classification\n"
+                result += f"- **Type**: {intent_data['purpose']}\n"
+                result += f"- **Trigger**: {intent_data['trigger_type'] or 'N/A'}\n"
+                result += f"- **Data Flow**: {intent_data['data_flow']}\n\n"
+
+                if intent_data['external_systems']:
+                    result += f"## 🔗 External Systems\n"
+                    for system in intent_data['external_systems']:
+                        result += f"- {system}\n"
+                    result += "\n"
+
+                if intent_data['assumptions']:
+                    result += f"## 💭 Assumptions\n"
+                    for assumption in intent_data['assumptions']:
+                        result += f"- {assumption}\n"
+                    result += "\n"
+
+                if intent_data['risks']:
+                    result += f"## ⚠️  Risks\n"
+                    for risk in intent_data['risks']:
+                        result += f"- {risk}\n"
+                    result += "\n"
+
+                result += f"## 📊 Template Metadata\n"
+                result += f"- **Source**: {template.source}\n"
+                result += f"- **Category**: {template.category}\n"
+                result += f"- **Complexity**: {template.complexity}\n"
+                result += f"- **Node Count**: {template.node_count}\n"
+                result += f"- **Error Handling**: {'✅ Yes' if template.has_error_handling else '❌ No'}\n"
+                result += f"- **Documentation**: {'✅ Yes' if template.has_documentation else '❌ No'}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "adapt_template":
+                template_id = arguments["template_id"]
+                replacements = arguments.get("replacements", {})
+                add_error_handling = arguments.get("add_error_handling", True)
+                modernize_nodes = arguments.get("modernize_nodes", True)
+
+                # Get template
+                template = await template_registry.get_template(template_id)
+
+                if not template:
+                    return [TextContent(type="text", text=f"Template {template_id} not found")]
+
+                # Adapt template
+                adapted_workflow = template_adapter.adapt_template(
+                    template,
+                    replacements=replacements,
+                    add_error_handling=add_error_handling,
+                    modernize_nodes=modernize_nodes
+                )
+
+                # Get adaptation log
+                adaptation_log = template_adapter.get_adaptation_log()
+
+                # Format result
+                result = f"# Template Adapted: {template.name}\n\n"
+
+                result += f"## ✅ Adaptation Complete\n\n"
+                result += f"**Changes Applied**:\n"
+                for log_entry in adaptation_log:
+                    result += f"- {log_entry}\n"
+                result += "\n"
+
+                result += f"## 📋 Next Steps\n\n"
+                result += f"1. Review the adapted workflow JSON below\n"
+                result += f"2. Configure required credentials\n"
+                result += f"3. Test in a safe environment\n"
+                result += f"4. Deploy to production\n\n"
+
+                result += f"## 🔧 Adapted Workflow\n\n"
+                result += f"```json\n{json.dumps(adapted_workflow, indent=2)}\n```\n"
+
+                # Track adaptation
+                provenance_tracker.record_adaptation(template_id, ", ".join(adaptation_log))
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_template_provenance":
+                template_id = arguments["template_id"]
+
+                # Get template
+                template = await template_registry.get_template(template_id)
+
+                if not template:
+                    return [TextContent(type="text", text=f"Template {template_id} not found")]
+
+                # Get or create provenance record
+                record = provenance_tracker.get_record(template_id)
+
+                if not record:
+                    record = provenance_tracker.track_template(
+                        template_id,
+                        template.name,
+                        template.source,
+                        template.author
+                    )
+
+                # Format result
+                result = f"# Template Provenance: {template.name}\n\n"
+
+                result += f"## 📊 Trust Metrics\n"
+                result += f"- **Overall Trust Score**: {record.overall_trust_score:.0%}\n"
+                result += f"- **Reliability Score**: {record.reliability_score:.0%}\n"
+                result += f"- **Security Score**: {record.security_score:.0%}\n"
+                result += f"- **Success Rate**: {record.success_rate:.0%} ({record.successful_executions}/{record.total_executions} executions)\n\n"
+
+                result += f"## 📈 Usage Statistics\n"
+                result += f"- **Total Usage**: {record.usage_count} times\n"
+                result += f"- **Deployments**: {record.deployment_count}\n"
+                result += f"- **Adaptations**: {record.adaptation_count}\n"
+                result += f"- **Last Used**: {record.last_used_at.strftime('%Y-%m-%d %H:%M') if record.last_used_at else 'Never'}\n\n"
+
+                result += f"## 🏷️  Source Info\n"
+                result += f"- **Source**: {template.source}\n"
+                result += f"- **Author**: {template.author or 'Unknown'}\n"
+                result += f"- **Created**: {template.created_at.strftime('%Y-%m-%d') if template.created_at else 'Unknown'}\n"
+
+                if template.source_url:
+                    result += f"- **URL**: {template.source_url}\n"
+
+                result += "\n"
+
+                result += f"## ✅ Quality Indicators\n"
+                result += f"- **Error Handling**: {'✅ Yes' if record.has_error_handling else '❌ No'}\n"
+                result += f"- **Documentation**: {'✅ Yes' if record.has_documentation else '❌ No'}\n"
+                result += f"- **Tests**: {'✅ Yes' if record.has_tests else '❌ No'}\n"
+                result += f"- **Best Practices**: {'✅ Yes' if record.uses_best_practices else '❌ No'}\n\n"
+
+                if record.rating:
+                    result += f"## ⭐ User Rating\n"
+                    result += f"- **Average**: {record.rating:.1f}/5.0 ({record.rating_count} ratings)\n\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_template_requirements":
+                template_id = arguments["template_id"]
+
+                # Get template
+                template = await template_registry.get_template(template_id)
+
+                if not template:
+                    return [TextContent(type="text", text=f"Template {template_id} not found")]
+
+                # Get requirements
+                placeholders = template_adapter.get_placeholders(template)
+                credentials = template_adapter.get_required_credentials(template)
+
+                # Format result
+                result = f"# Template Requirements: {template.name}\n\n"
+
+                if placeholders:
+                    result += f"## 📝 Placeholders to Fill ({len(placeholders)})\n\n"
+                    for placeholder in placeholders:
+                        result += f"### {placeholder['key']}\n"
+                        result += f"- **Placeholder**: `{placeholder['placeholder']}`\n"
+                        result += f"- **Node**: {placeholder['node']}\n"
+                        result += f"- **Required**: {'✅ Yes' if placeholder['required'] else '❌ No'}\n\n"
+                else:
+                    result += f"## ✅ No Placeholders\nThis template is ready to use without placeholder replacement.\n\n"
+
+                if credentials:
+                    result += f"## 🔑 Credentials Needed ({len(credentials)})\n\n"
+                    for cred in credentials:
+                        result += f"### {cred['name']}\n"
+                        result += f"- **Type**: {cred['type']}\n"
+                        result += f"- **Used by**: {cred['node']}\n"
+                        result += f"- **Required**: {'✅ Yes' if cred['required'] else '❌ No'}\n\n"
+                else:
+                    result += f"## ✅ No Credentials\nThis template doesn't require credential configuration.\n\n"
+
+                if template.external_systems:
+                    result += f"## 🌐 External Systems ({len(template.external_systems)})\n\n"
+                    for system in template.external_systems:
+                        result += f"- {system}\n"
+                    result += "\n"
+
+                result += f"## 📋 Pre-Deployment Checklist\n\n"
+                result += f"- [ ] Fill all placeholders ({len(placeholders)} total)\n"
+                result += f"- [ ] Configure credentials ({len(credentials)} total)\n"
+                result += f"- [ ] Verify access to external systems ({len(template.external_systems or [])} total)\n"
+                result += f"- [ ] Test in staging environment\n"
+                result += f"- [ ] Review error handling\n"
+                result += f"- [ ] Deploy to production\n"
 
                 return [TextContent(type="text", text=result)]
 
