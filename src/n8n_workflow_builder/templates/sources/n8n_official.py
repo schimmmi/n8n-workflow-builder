@@ -16,22 +16,27 @@ class N8nOfficialSource(TemplateSource):
 
     async def fetch_templates(self) -> List[TemplateMetadata]:
         """Fetch all official n8n templates"""
+        all_templates = []
+
+        # ALWAYS include hardcoded templates first (high quality, curated)
+        hardcoded = self._get_hardcoded_templates()
+        all_templates.extend(hardcoded)
+
+        # Try to fetch additional templates from API
         try:
-            # Try official API first
             response = await self.client.get(f"{self.base_url}/search")
             if response.status_code == 200:
                 templates_data = response.json().get("workflows", [])
-                templates = []
                 for raw in templates_data:
                     template = self.normalize_template(raw)
-                    self.cache[template.id] = template
-                    templates.append(template)
-                return templates
+                    # Only add if not duplicate
+                    if template.id not in self.cache:
+                        self.cache[template.id] = template
+                        all_templates.append(template)
         except Exception:
-            pass
+            pass  # Ignore API errors, we have hardcoded templates
 
-        # Fallback: Use hardcoded official templates
-        return self._get_hardcoded_templates()
+        return all_templates
 
     async def get_template(self, template_id: str) -> Optional[TemplateMetadata]:
         """Get specific template"""
