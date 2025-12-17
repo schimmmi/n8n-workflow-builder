@@ -1,0 +1,455 @@
+{
+  "nodes": {
+    "n8n-nodes-base.httpRequest": {
+      "current_version": 4.2,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.180.0",
+          "issues": [
+            {
+              "type": "deprecated_parameter",
+              "parameter": "url",
+              "severity": "high",
+              "message": "Parameter 'url' is deprecated since v2. Use 'requestUrl' instead.",
+              "fix": "Rename 'url' to 'requestUrl'"
+            },
+            {
+              "type": "deprecated_parameter",
+              "parameter": "method",
+              "severity": "high",
+              "message": "Parameter 'method' is deprecated since v2. Use 'requestMethod' instead.",
+              "fix": "Rename 'method' to 'requestMethod'"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.220.0",
+          "issues": [
+            {
+              "type": "deprecated_parameter",
+              "parameter": "url",
+              "severity": "high",
+              "message": "Parameter 'url' is deprecated. Use 'requestUrl' instead.",
+              "fix": "Rename 'url' to 'requestUrl'"
+            },
+            {
+              "type": "deprecated_parameter",
+              "parameter": "method",
+              "severity": "high",
+              "message": "Parameter 'method' is deprecated. Use 'requestMethod' instead.",
+              "fix": "Rename 'method' to 'requestMethod'"
+            }
+          ]
+        },
+        "3.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.0.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Authentication structure changed in v4. Consider migrating to new auth options.",
+              "fix": "Review authentication configuration"
+            }
+          ]
+        },
+        "4.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.2": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.postgres": {
+      "current_version": 2.4,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.200.0",
+          "issues": [
+            {
+              "type": "deprecated_parameter",
+              "parameter": "executeQuery",
+              "severity": "high",
+              "message": "Parameter 'executeQuery' is deprecated. Use 'query' instead.",
+              "fix": "Rename 'executeQuery' to 'query'"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.4": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.slack": {
+      "current_version": 2.1,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.210.0",
+          "issues": [
+            {
+              "type": "deprecated_parameter",
+              "parameter": "message.text",
+              "severity": "medium",
+              "message": "Message structure changed in v2. Use flat 'text' parameter instead.",
+              "fix": "Move 'message.text' to 'text'"
+            },
+            {
+              "type": "deprecated_parameter",
+              "parameter": "message.attachments",
+              "severity": "medium",
+              "message": "Attachments structure changed in v2. Use 'blocks' instead.",
+              "fix": "Convert 'attachments' to 'blocks' format"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.1": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.function": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": [
+            {
+              "type": "api_change",
+              "severity": "critical",
+              "message": "Function API changed in n8n 1.0. Check if code uses deprecated methods like $item() or $items().",
+              "fix": "Update to new API: items[0] instead of $item(), items instead of $items()"
+            }
+          ]
+        }
+      }
+    },
+    "n8n-nodes-base.webhook": {
+      "current_version": 2.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.190.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "low",
+              "message": "Response options structure changed in v2.",
+              "fix": "Review response configuration"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.set": {
+      "current_version": 3.3,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.180.0",
+          "issues": [
+            {
+              "type": "deprecated_parameter",
+              "parameter": "options",
+              "severity": "low",
+              "message": "Options structure changed in v2.",
+              "fix": "Update options configuration"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.3": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.code": {
+      "current_version": 2.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.0.0",
+          "issues": [
+            {
+              "type": "breaking_change",
+              "severity": "critical",
+              "message": "Code node API changed significantly in n8n 1.0. Manual review required.",
+              "fix": "Review and update code for new API"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.if": {
+      "current_version": 2.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.0.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Condition structure changed in v2.",
+              "fix": "Update condition configuration"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.switch": {
+      "current_version": 3.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.200.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Switch rules structure changed.",
+              "fix": "Update switch rules"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.0.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "low",
+              "message": "Enhanced routing options available in v3.",
+              "fix": "Consider upgrading to v3"
+            }
+          ]
+        },
+        "3.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.github": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.googleSheets": {
+      "current_version": 4.4,
+      "versions": {
+        "3.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.230.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Authentication and operations updated in v4.",
+              "fix": "Review authentication and operation configuration"
+            }
+          ]
+        },
+        "4.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "4.4": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.telegram": {
+      "current_version": 1.2,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.agent": {
+      "current_version": 1.5,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.30.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "high",
+              "message": "Agent configuration structure updated in newer versions.",
+              "fix": "Review agent configuration"
+            }
+          ]
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.4": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.5": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    }
+  },
+  "n8n_versions": {
+    "0.180.0": {
+      "release_date": "2023-03-01",
+      "breaking_changes": [
+        "HTTP Request node v1 deprecated",
+        "Set node v1 deprecated"
+      ]
+    },
+    "0.190.0": {
+      "release_date": "2023-05-01",
+      "breaking_changes": [
+        "Webhook node v1 deprecated"
+      ]
+    },
+    "0.200.0": {
+      "release_date": "2023-07-01",
+      "breaking_changes": [
+        "Postgres node v1 deprecated",
+        "Switch node v1 deprecated"
+      ]
+    },
+    "0.210.0": {
+      "release_date": "2023-09-01",
+      "breaking_changes": [
+        "Slack node v1 deprecated"
+      ]
+    },
+    "0.220.0": {
+      "release_date": "2023-11-01",
+      "breaking_changes": [
+        "HTTP Request node v2 deprecated"
+      ]
+    },
+    "0.230.0": {
+      "release_date": "2024-01-01",
+      "breaking_changes": [
+        "Google Sheets v3 deprecated"
+      ]
+    },
+    "1.0.0": {
+      "release_date": "2024-06-01",
+      "breaking_changes": [
+        "Function/Code node API changed",
+        "IF node v1 deprecated",
+        "Switch node v2 deprecated",
+        "HTTP Request node v3 deprecated"
+      ]
+    },
+    "1.30.0": {
+      "release_date": "2024-11-01",
+      "breaking_changes": [
+        "LangChain agent configuration updated"
+      ]
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2025-12-17",
+    "total_nodes": 14,
+    "description": "n8n Node Compatibility Database - Tracks breaking changes, deprecated parameters, and migration paths"
+  }
+}

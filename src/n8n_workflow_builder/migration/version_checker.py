@@ -7,6 +7,9 @@ and identifies outdated parameters/configurations.
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
+import json
+import os
+from pathlib import Path
 
 
 class CompatibilityStatus(Enum):
@@ -52,39 +55,80 @@ class NodeVersionChecker:
     Checks node compatibility with current n8n version
     """
 
-    def __init__(self):
-        # Known node versions and their breaking changes
-        self.node_versions = {
-            "n8n-nodes-base.httpRequest": {
-                "1": {"deprecated": False},
-                "2": {"deprecated": False},
-                "3": {"deprecated": False, "changes": ["authentication moved to credentials"]},
-                "4": {"deprecated": False, "changes": ["new authentication options"]},
-            },
-            "n8n-nodes-base.postgres": {
-                "1": {"deprecated": False},
-                "2": {"deprecated": False, "changes": ["query parameters changed"]},
-            },
-            "n8n-nodes-base.slack": {
-                "1": {"deprecated": True, "replacement": "n8n-nodes-base.slack"},
-                "2": {"deprecated": False, "changes": ["new message formatting"]},
-            },
-            "n8n-nodes-base.webhook": {
-                "1": {"deprecated": False},
-                "2": {"deprecated": False, "changes": ["new response options"]},
-            },
-        }
+    def __init__(self, db_path: Optional[str] = None):
+        """
+        Initialize checker with compatibility database
 
-        # Known deprecated parameters
-        self.deprecated_parameters = {
-            "n8n-nodes-base.httpRequest": {
-                "url": {"since": "v3", "replacement": "requestUrl"},
-                "method": {"since": "v3", "replacement": "requestMethod"},
-            },
-            "n8n-nodes-base.postgres": {
-                "operation": {"values": {"executeQuery": {"since": "v2", "replacement": "query"}}},
-            },
-        }
+        Args:
+            db_path: Path to compatibility_db.json (defaults to package directory)
+        """
+        if db_path is None:
+            # Default to compatibility_db.json in same directory
+            current_dir = Path(__file__).parent
+            db_path = current_dir / "compatibility_db.json"
+
+        self.db_path = db_path
+        self.compatibility_db = self._load_compatibility_db()
+
+        # Legacy format for backward compatibility
+        self.node_versions = self._build_node_versions()
+        self.deprecated_parameters = self._build_deprecated_parameters()
+
+    def _load_compatibility_db(self) -> Dict:
+        """Load compatibility database from JSON file"""
+        try:
+            with open(self.db_path, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            # Fallback to empty database if file doesn't exist
+            return {
+                "nodes": {},
+                "n8n_versions": {},
+                "metadata": {"version": "1.0.0", "total_nodes": 0}
+            }
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid compatibility database JSON: {e}")
+
+    def _build_node_versions(self) -> Dict:
+        """Build legacy node_versions format from database"""
+        node_versions = {}
+        for node_type, node_data in self.compatibility_db.get("nodes", {}).items():
+            versions = {}
+            for version, version_data in node_data.get("versions", {}).items():
+                status = version_data.get("status", "unknown")
+                versions[version] = {
+                    "deprecated": status == "deprecated",
+                    "changes": [issue["message"] for issue in version_data.get("issues", [])]
+                }
+            node_versions[node_type] = versions
+        return node_versions
+
+    def _build_deprecated_parameters(self) -> Dict:
+        """Build legacy deprecated_parameters format from database"""
+        deprecated_params = {}
+        for node_type, node_data in self.compatibility_db.get("nodes", {}).items():
+            params = {}
+            for version, version_data in node_data.get("versions", {}).items():
+                for issue in version_data.get("issues", []):
+                    if issue["type"] == "deprecated_parameter":
+                        param_name = issue.get("parameter")
+                        if param_name:
+                            # Extract replacement from fix message if available
+                            fix = issue.get("fix", "")
+                            replacement = None
+                            if "Rename" in fix and "to" in fix:
+                                # Extract: "Rename 'url' to 'requestUrl'" -> "requestUrl"
+                                parts = fix.split("to")
+                                if len(parts) > 1:
+                                    replacement = parts[1].strip().strip("'\"")
+
+                            params[param_name] = {
+                                "since": f"v{version}",
+                                "replacement": replacement
+                            }
+            if params:
+                deprecated_params[node_type] = params
+        return deprecated_params
 
     def check_workflow_compatibility(self, workflow: Dict) -> CompatibilityResult:
         """
@@ -135,8 +179,11 @@ class NodeVersionChecker:
         type_version = node.get("typeVersion", 1)
         parameters = node.get("parameters", {})
 
-        # Check if node type exists in our knowledge base
-        if node_type not in self.node_versions:
+        # Check if node type exists in compatibility database
+        node_data = self.compatibility_db.get("nodes", {}).get(node_type)
+
+        if not node_data:
+            # Node not in database
             issues.append(CompatibilityIssue(
                 node_name=node_name,
                 node_type=node_type,
@@ -147,65 +194,70 @@ class NodeVersionChecker:
             ))
             return issues
 
-        # Check node version
-        version_info = self.node_versions[node_type].get(str(type_version))
-        if not version_info:
+        # Get current version from database
+        current_version = node_data.get("current_version")
+        versions = node_data.get("versions", {})
+
+        # Check if node's version exists in database
+        version_str = str(type_version)
+        if version_str not in versions:
+            # Try with float format (e.g., "4.2")
+            version_float = float(type_version)
+            version_str = str(version_float)
+
+        version_data = versions.get(version_str)
+
+        if not version_data:
             issues.append(CompatibilityIssue(
                 node_name=node_name,
                 node_type=node_type,
                 issue_type="version_mismatch",
                 severity="medium",
-                description=f"Node version {type_version} is unknown. Latest might be available.",
-                suggested_fix=f"Consider updating to latest version",
+                description=f"Version {type_version} is unknown. Current version: {current_version}",
+                suggested_fix=f"Consider updating to version {current_version}",
                 migration_available=True,
             ))
-        elif version_info.get("deprecated"):
-            replacement = version_info.get("replacement", "unknown")
+            return issues
+
+        # Check version status
+        status = version_data.get("status", "unknown")
+
+        if status == "deprecated":
+            deprecated_since = version_data.get("deprecated_since", "unknown")
             issues.append(CompatibilityIssue(
                 node_name=node_name,
                 node_type=node_type,
                 issue_type="deprecated_node",
                 severity="high",
-                description=f"Node type is deprecated",
-                suggested_fix=f"Migrate to: {replacement}",
+                description=f"Node version {type_version} is deprecated since n8n {deprecated_since}",
+                suggested_fix=f"Update to version {current_version}",
                 migration_available=True,
             ))
 
-        # Check for deprecated parameters
-        if node_type in self.deprecated_parameters:
-            deprecated_params = self.deprecated_parameters[node_type]
+        # Add all issues from database for this version
+        for issue_data in version_data.get("issues", []):
+            issue_type = issue_data.get("type", "unknown")
+            severity = issue_data.get("severity", "low")
+            message = issue_data.get("message", "No description")
+            fix = issue_data.get("fix", None)
+            parameter = issue_data.get("parameter", None)
 
-            for param_name, param_info in deprecated_params.items():
-                if param_name in parameters:
-                    # Check if specific value is deprecated
-                    if "values" in param_info:
-                        param_value = parameters[param_name]
-                        if param_value in param_info["values"]:
-                            value_info = param_info["values"][param_value]
-                            issues.append(CompatibilityIssue(
-                                node_name=node_name,
-                                node_type=node_type,
-                                issue_type="deprecated_parameter",
-                                severity="medium",
-                                description=f"Parameter value '{param_name}={param_value}' is deprecated since {value_info['since']}",
-                                old_value=str(param_value),
-                                suggested_fix=f"Use '{value_info['replacement']}' instead",
-                                migration_available=True,
-                            ))
-                    else:
-                        issues.append(CompatibilityIssue(
-                            node_name=node_name,
-                            node_type=node_type,
-                            issue_type="deprecated_parameter",
-                            severity="medium",
-                            description=f"Parameter '{param_name}' is deprecated since {param_info['since']}",
-                            old_value=str(parameters[param_name]),
-                            suggested_fix=f"Use '{param_info['replacement']}' instead",
-                            migration_available=True,
-                        ))
+            # Check if deprecated parameter actually exists in node
+            if issue_type == "deprecated_parameter" and parameter:
+                if parameter not in parameters:
+                    # Parameter not used, skip this issue
+                    continue
 
-        # Check for missing required parameters (if we have schema info)
-        # This could be extended with actual n8n node schemas
+            issues.append(CompatibilityIssue(
+                node_name=node_name,
+                node_type=node_type,
+                issue_type=issue_type,
+                severity=severity,
+                description=message,
+                old_value=parameter,
+                suggested_fix=fix,
+                migration_available=True,
+            ))
 
         return issues
 
