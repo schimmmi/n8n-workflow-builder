@@ -56,6 +56,13 @@ from .templates import (
     TemplateAdapter,
     ProvenanceTracker
 )
+from .migration import (
+    NodeVersionChecker,
+    MigrationEngine,
+    WorkflowUpdater,
+    MigrationReporter,
+    MIGRATION_RULES
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -81,6 +88,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     template_registry = TemplateRegistry()
     template_adapter = TemplateAdapter()
     provenance_tracker = ProvenanceTracker()
+
+    # Migration System
+    workflow_updater = WorkflowUpdater(MIGRATION_RULES)
+    migration_reporter = MigrationReporter()
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -1095,6 +1106,106 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         "template_id":{"type":"string","description":"Template ID"}
                     },
                     "required":["template_id"]
+                }
+            ),
+            # Migration & Compatibility Tools
+            Tool(
+                name="check_workflow_compatibility",
+                description=(
+                    "🔍 Check workflow for node compatibility issues with current n8n version. "
+                    "Detects deprecated parameters, breaking changes, and outdated node versions. "
+                    "Essential before deploying old workflows or community templates."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to check"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="migrate_workflow",
+                description=(
+                    "🔄 Automatically migrate workflow to latest node versions. "
+                    "Applies migration rules to update deprecated parameters, fix breaking changes, "
+                    "and upgrade node versions. Includes dry-run mode for preview."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to migrate"
+                        },
+                        "dry_run": {
+                            "type": "boolean",
+                            "description": "If true, preview changes without applying (default: false)",
+                            "default": False
+                        },
+                        "target_version": {
+                            "type": "number",
+                            "description": "Optional: Target node version (defaults to latest)"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="get_migration_preview",
+                description=(
+                    "👁️ Preview what would change if workflow is migrated. "
+                    "Shows detailed diff of node versions, parameter changes, and migration steps. "
+                    "Use before migrating to understand impact."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to preview"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="batch_check_compatibility",
+                description=(
+                    "📊 Batch check compatibility for multiple workflows. "
+                    "Scans all workflows (or filtered list) for compatibility issues. "
+                    "Perfect for auditing entire n8n instance after version upgrade."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional: Specific workflow IDs (if not provided, checks all)"
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="get_available_migrations",
+                description=(
+                    "📋 List available migration rules for a node type. "
+                    "Shows what migrations are available, from/to versions, and severity. "
+                    "Useful for understanding what can be auto-migrated."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "node_type": {
+                            "type": "string",
+                            "description": "Node type (e.g., 'n8n-nodes-base.httpRequest')"
+                        }
+                    },
+                    "required": ["node_type"]
                 }
             )
         ]
@@ -3618,6 +3729,107 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 result += f"- [ ] Test in staging environment\n"
                 result += f"- [ ] Review error handling\n"
                 result += f"- [ ] Deploy to production\n"
+
+                return [TextContent(type="text", text=result)]
+
+            # Migration & Compatibility Tools
+            elif name == "check_workflow_compatibility":
+                workflow_id = arguments["workflow_id"]
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                compatibility_result = workflow_updater.version_checker.check_workflow_compatibility(workflow)
+                report = migration_reporter.generate_compatibility_report(workflow, compatibility_result)
+
+                return [TextContent(type="text", text=report)]
+
+            elif name == "migrate_workflow":
+                workflow_id = arguments["workflow_id"]
+                dry_run = arguments.get("dry_run", False)
+                target_version = arguments.get("target_version")
+
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                # Check compatibility before migration
+                before_result = workflow_updater.version_checker.check_workflow_compatibility(workflow)
+
+                # Perform migration
+                updated_workflow, after_result, migration_log = workflow_updater.check_and_update(
+                    workflow,
+                    auto_migrate=True,
+                    dry_run=dry_run
+                )
+
+                # If not dry run, update in n8n
+                if not dry_run and migration_log:
+                    updated_workflow = await n8n_client.update_workflow(workflow_id, updated_workflow)
+
+                # Generate report
+                report = migration_reporter.generate_migration_report(
+                    updated_workflow,
+                    migration_log if isinstance(migration_log, list) else [],
+                    before_result,
+                    after_result
+                )
+
+                return [TextContent(type="text", text=report)]
+
+            elif name == "get_migration_preview":
+                workflow_id = arguments["workflow_id"]
+                workflow = await n8n_client.get_workflow(workflow_id)
+
+                preview = workflow_updater.get_update_preview(workflow)
+                summary = workflow_updater.get_migration_summary(workflow)
+
+                return [TextContent(type="text", text=summary)]
+
+            elif name == "batch_check_compatibility":
+                workflow_ids = arguments.get("workflow_ids")
+
+                # If no IDs provided, get all workflows
+                if not workflow_ids:
+                    workflows = await n8n_client.get_workflows()
+                    workflow_ids = [w["id"] for w in workflows]
+
+                # Fetch workflows
+                workflows = []
+                for wf_id in workflow_ids:
+                    try:
+                        wf = await n8n_client.get_workflow(wf_id)
+                        workflows.append(wf)
+                    except Exception as e:
+                        logger.error(f"Failed to fetch workflow {wf_id}: {e}")
+
+                # Check compatibility
+                results = []
+                for workflow in workflows:
+                    compatibility = workflow_updater.version_checker.check_workflow_compatibility(workflow)
+                    results.append((workflow, compatibility, []))
+
+                # Generate batch report
+                report = migration_reporter.generate_batch_report(results)
+
+                return [TextContent(type="text", text=report)]
+
+            elif name == "get_available_migrations":
+                node_type = arguments["node_type"]
+
+                from .migration.migration_rules import get_rules_for_node
+
+                rules = get_rules_for_node(node_type)
+
+                if not rules:
+                    return [TextContent(type="text", text=f"No migration rules found for node type: {node_type}")]
+
+                result = f"# Available Migrations for {node_type}\n\n"
+                result += f"**Total Rules:** {len(rules)}\n\n"
+
+                for rule in rules:
+                    result += f"## {rule.name}\n"
+                    result += f"- **ID:** `{rule.rule_id}`\n"
+                    result += f"- **Version:** {rule.from_version} → {rule.to_version}\n"
+                    result += f"- **Severity:** {rule.severity}\n"
+                    result += f"- **Description:** {rule.description}\n"
+                    result += "\n"
 
                 return [TextContent(type="text", text=result)]
 
