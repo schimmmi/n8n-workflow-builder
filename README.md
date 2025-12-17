@@ -177,6 +177,36 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Semantic Understanding**: "AI analysis" matches "machine learning", "telegram" matches "notification"
 - **Transparent Matching**: Shows WHY templates match with detailed explanations
 
+### 📦 Node Discovery System (NEW!)
+**Workflow-based learning that discovers available n8n nodes without API dependency**
+
+#### Intelligent Discovery
+- **Automatic Learning**: Analyzes your workflows to discover all node types you use
+- **Real-World Schemas**: Extracts actual parameters from live workflows (not documentation!)
+- **Usage Insights**: Tracks node popularity, parameter types, credential requirements
+- **SQLite Persistence**: Knowledge saved to `~/.n8n-mcp/node_discovery.db`
+- **Zero Configuration**: Works on all n8n versions - no API required!
+
+#### Smart Recommendations
+- **Task-Based Suggestions**: "send slack message" → Telegram, Gmail, chatTrigger
+- **Advanced Scoring**: Exact keyword (5pts), Synonym (2.5pts), Parameter (+1pt), Popularity (+3pts max)
+- **Bidirectional Synonyms**: 40+ mappings (slack↔telegram, excel↔sheets, database↔postgres)
+- **Reason Generation**: "Matches: send, message" or "Similar: slack" explains why nodes match
+- **Category Classification**: ⚡trigger, 📊data_source, 🔄transform, 📬notification, 🌐http, 🔀logic, 🔧utility
+
+#### Smart Search & Schema
+- **Keyword Search**: Find nodes by name with category icons
+- **Detailed Schemas**: Get parameter names, types, credentials, usage counts
+- **Parameter Type Inference**: Learns types from real data (string, number, boolean, object, array)
+- **Usage Statistics**: See which nodes are most popular in your workflows
+
+#### Performance
+- **Fast Discovery**: 100 workflows in ~15s
+- **Quick Recommendations**: < 200ms for 100 discovered nodes
+- **In-Memory Caching**: Database loaded on startup for instant queries
+
+**4 New Tools**: `discover_nodes`, `get_node_schema`, `search_nodes`, `recommend_nodes_for_task`
+
 ### 🔄 Migration Engine (NEW!)
 - **Automatic Compatibility Checking**: Detects deprecated nodes and parameters in workflows
 - **Smart Migration Rules**: 7 built-in rules for common n8n nodes (HTTP, Postgres, Slack, etc.)

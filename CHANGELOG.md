@@ -5,6 +5,149 @@ All notable changes to the n8n Workflow Builder MCP Server will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2025-12-17
+
+### 🎉 Added - Node Discovery System
+
+**Major Feature**: Workflow-based learning system that discovers n8n nodes and provides intelligent recommendations.
+
+#### New MCP Tools
+- **`discover_nodes`** - Analyze workflows to discover node types
+  - Scans all workflows via n8n API
+  - Extracts node types, parameters, credentials
+  - Tracks usage statistics and popularity
+  - Infers parameter types from real data
+  - Persists to SQLite (~/.n8n-mcp/node_discovery.db)
+
+- **`get_node_schema`** - Get detailed schema for discovered nodes
+  - Parameter names and inferred types
+  - Credential requirements
+  - Usage count across workflows
+  - Real-world configuration examples
+
+- **`search_nodes`** - Search nodes by keyword
+  - Keyword matching in node type and name
+  - Category classification (trigger, data_source, transform, notification, http, logic, utility)
+  - Icon-based visual categorization (⚡📊🔄📬🌐🔀🔧)
+  - Sorted by popularity
+
+- **`recommend_nodes_for_task`** - AI-powered node recommendations
+  - Natural language task descriptions
+  - Advanced scoring algorithm (exact: 5pts, synonym: 2.5pts, parameter: +1pt)
+  - Bidirectional synonym matching (40+ terms)
+  - Popularity boost (max 3pts)
+  - Detailed reason generation
+
+#### Advanced Features
+
+**Synonym Matching (Bidirectional)**
+- `slack` ↔ telegram, discord, mattermost, matrix, chat, message
+- `excel` ↔ sheets, spreadsheet, airtable, table
+- `database` ↔ postgres, mysql, mongodb, sql, db
+- `send` ↔ post, push, publish, transmit
+- `read` ↔ get, fetch, retrieve, load
+- `cloud` ↔ drive, dropbox, s3, storage
+- 40+ comprehensive synonym mappings
+
+**Parameter-Based Scoring**
+- Bonus points for nodes with relevant parameters
+- "email" task → finds nodes with "email" parameter
+- Helps distinguish similar nodes by capabilities
+
+**Category Tagging**
+- 7 categories: trigger, data_source, transform, notification, http, logic, utility
+- Auto-categorization based on node_type keywords
+- Persisted in database for consistency
+- Visual icons in search results
+
+**Stopword Filtering**
+- Filters 23 common English words (and, to, from, the, etc.)
+- Filters words < 3 characters
+- Improves matching relevance
+
+#### Architecture
+
+**Database Persistence**
+- Location: `~/.n8n-mcp/node_discovery.db`
+- SQLite with discovered_nodes table
+- Stores node types, parameters, types, credentials, usage counts
+- Auto-loads on server start
+- Survives restarts
+
+**Performance**
+- Discovery: 10 workflows (~2s), 100 workflows (~15s)
+- Recommendations: < 200ms for 100 nodes
+- In-memory caching for fast queries
+
+### 🐛 Fixed
+
+**Synonym Matching Fixes**
+- Fixed synonyms not appearing in recommendation reasons
+- Fixed bidirectional synonym mapping
+- Show original user keywords in "Similar:" section (not found synonyms)
+- Example: User says "slack" → Telegram shows "Similar: slack" ✅
+
+**Scope Fixes**
+- Fixed `NameError: name 'node_recommender' is not defined`
+- Changed `global` to `nonlocal` for proper nested function scope
+
+### 🔄 Improved
+
+**Scoring Algorithm**
+- Increased exact keyword match from +2 to +5 points
+- Added synonym match at +2.5 points (0.5x weight)
+- Reduced popularity boost from +5 to +3 max
+- Popularity only added if keywords match (prevents irrelevant popular nodes)
+- Parameter matching adds +1 point bonus
+
+**Recommendation Reasons**
+- Shows exact keyword matches: "Matches: send, message"
+- Shows synonym matches: "Similar: slack"
+- Shows popularity: "highly popular" or "commonly used"
+- Clear explanation of why node was recommended
+
+### 📚 Documentation
+
+**New Files**
+- `docs/NODE_DISCOVERY.md` - Complete 850+ line guide
+  - Overview and features
+  - Architecture and data flow
+  - Usage examples
+  - Advanced features (synonyms, parameters, categories)
+  - Best practices
+  - Troubleshooting
+  - Performance metrics
+  - API reference
+
+- `releases/v1.19.0.md` - Detailed release notes
+  - Feature descriptions
+  - Usage examples
+  - Migration guide
+  - Performance stats
+  - Future roadmap
+
+### ✅ Testing
+
+Comprehensive testing with 42 real workflows:
+- ✅ Discovery: 66 node types, 1644 instances
+- ✅ Schema extraction: Full parameter schemas with types
+- ✅ Search: Category-based filtering with icons
+- ✅ Recommendations: Synonym matching verified
+  - "send slack message" → Telegram with "Similar: slack"
+  - "read excel spreadsheet" → Sheets with "Similar: excel"
+  - "store files in cloud" → Drive with "Similar: cloud"
+
+### 🔮 Future Enhancements
+
+Planned for upcoming releases:
+- Usage pattern analysis (common node combinations)
+- Parameter value learning (suggest defaults)
+- Workflow template mining (extract reusable patterns)
+- Node deprecation detection (migration suggestions)
+- Custom synonym dictionaries (user-defined, domain-specific)
+
+---
+
 ## [1.18.1] - 2025-12-17
 
 ### 🐛 Fixed - Template System Bugfixes
