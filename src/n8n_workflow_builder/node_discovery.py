@@ -402,11 +402,32 @@ class NodeRecommender:
         # Build reverse synonym map for faster lookup
         self.expanded_synonyms = self._build_synonym_map()
 
-    def _build_synonym_map(self) -> Dict[str, List[str]]:
-        """Build expanded synonym map for efficient lookup"""
+    def _build_synonym_map(self) -> Dict[str, set]:
+        """Build bidirectional synonym map for efficient lookup"""
         synonym_map = {}
+
+        # First pass: direct mappings
         for word, synonyms in self.SYNONYMS.items():
-            synonym_map[word] = synonyms
+            if word not in synonym_map:
+                synonym_map[word] = set()
+            synonym_map[word].update(synonyms)
+
+        # Second pass: create reverse mappings (bidirectional)
+        reverse_mappings = {}
+        for word, synonyms in self.SYNONYMS.items():
+            for synonym in synonyms:
+                if synonym not in reverse_mappings:
+                    reverse_mappings[synonym] = set()
+                reverse_mappings[synonym].add(word)
+                # Also add other synonyms of the same group
+                reverse_mappings[synonym].update(s for s in synonyms if s != synonym)
+
+        # Merge reverse mappings
+        for word, synonyms in reverse_mappings.items():
+            if word not in synonym_map:
+                synonym_map[word] = set()
+            synonym_map[word].update(synonyms)
+
         return synonym_map
 
     def _get_expanded_keywords(self, keywords: List[str]) -> List[tuple]:
@@ -474,6 +495,19 @@ class NodeRecommender:
                         else:
                             synonym_matches.append(keyword)
 
+            # Also check reverse: does node_type contain synonyms of user keywords?
+            for original_keyword in keywords:
+                if original_keyword in self.expanded_synonyms:
+                    for synonym in self.expanded_synonyms[original_keyword]:
+                        if synonym in node_type_lower and synonym not in [kw for kw, _ in expanded_keywords]:
+                            # Node contains a synonym of user's keyword
+                            if f".{synonym}" in node_type_lower or node_type_lower.endswith(synonym):
+                                score += 2.5  # Half of strong match (5 * 0.5)
+                                synonym_matches.append(synonym)
+                            else:
+                                score += 1.0  # Half of partial match (2 * 0.5)
+                                synonym_matches.append(synonym)
+
             # Match keywords in node name
             for keyword, weight in expanded_keywords:
                 if keyword in node_name and keyword not in keyword_matches:
@@ -482,6 +516,14 @@ class NodeRecommender:
                         keyword_matches.append(keyword)
                     else:
                         synonym_matches.append(keyword)
+
+            # Reverse match in node name
+            for original_keyword in keywords:
+                if original_keyword in self.expanded_synonyms:
+                    for synonym in self.expanded_synonyms[original_keyword]:
+                        if synonym in node_name and synonym not in keyword_matches and synonym not in synonym_matches:
+                            score += 1.5  # Half of name match (3 * 0.5)
+                            synonym_matches.append(synonym)
 
             # Match keywords in parameters (bonus for nodes with relevant parameters)
             for keyword, weight in expanded_keywords:
