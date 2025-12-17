@@ -470,7 +470,8 @@ class NodeRecommender:
         for node_type, schema in self.discovery.discovered_nodes.items():
             score = 0
             keyword_matches = []
-            synonym_matches = []
+            synonym_matches = []  # Will store original user keywords that matched via synonyms
+            matched_via_synonyms = {}  # Maps original_keyword -> matched_synonym in node
 
             node_type_lower = node_type.lower()
             node_name = schema.get('name', '').lower()
@@ -485,15 +486,13 @@ class NodeRecommender:
                         score += match_score
                         if weight == 1.0:
                             keyword_matches.append(keyword)
-                        else:
-                            synonym_matches.append(keyword)
+                        # Don't add expanded synonyms to synonym_matches here
                     else:
                         match_score = 2 * weight  # Partial match with weight
                         score += match_score
                         if weight == 1.0:
                             keyword_matches.append(keyword)
-                        else:
-                            synonym_matches.append(keyword)
+                        # Don't add expanded synonyms to synonym_matches here
 
             # Also check reverse: does node_type contain synonyms of user keywords?
             for original_keyword in keywords:
@@ -501,12 +500,15 @@ class NodeRecommender:
                     for synonym in self.expanded_synonyms[original_keyword]:
                         if synonym in node_type_lower and synonym not in [kw for kw, _ in expanded_keywords]:
                             # Node contains a synonym of user's keyword
+                            # Store that original_keyword matched via this synonym
+                            if original_keyword not in matched_via_synonyms:
+                                matched_via_synonyms[original_keyword] = []
+                            matched_via_synonyms[original_keyword].append(synonym)
+
                             if f".{synonym}" in node_type_lower or node_type_lower.endswith(synonym):
                                 score += 2.5  # Half of strong match (5 * 0.5)
-                                synonym_matches.append(synonym)
                             else:
                                 score += 1.0  # Half of partial match (2 * 0.5)
-                                synonym_matches.append(synonym)
 
             # Match keywords in node name
             for keyword, weight in expanded_keywords:
@@ -514,16 +516,20 @@ class NodeRecommender:
                     score += 3 * weight
                     if weight == 1.0:
                         keyword_matches.append(keyword)
-                    else:
-                        synonym_matches.append(keyword)
 
             # Reverse match in node name
             for original_keyword in keywords:
                 if original_keyword in self.expanded_synonyms:
                     for synonym in self.expanded_synonyms[original_keyword]:
-                        if synonym in node_name and synonym not in keyword_matches and synonym not in synonym_matches:
+                        if synonym in node_name and synonym not in keyword_matches:
+                            if original_keyword not in matched_via_synonyms:
+                                matched_via_synonyms[original_keyword] = []
+                            if synonym not in matched_via_synonyms[original_keyword]:
+                                matched_via_synonyms[original_keyword].append(synonym)
                             score += 1.5  # Half of name match (3 * 0.5)
-                            synonym_matches.append(synonym)
+
+            # Convert matched_via_synonyms to synonym_matches list (user keywords that matched)
+            synonym_matches = list(matched_via_synonyms.keys())
 
             # Match keywords in parameters (bonus for nodes with relevant parameters)
             for keyword, weight in expanded_keywords:
