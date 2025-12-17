@@ -1267,6 +1267,22 @@ For detailed information about the template system, see:
 - AI-powered template recommendations
 - Semantic matching and quality scoring
 
+## 📁 Example Workflows
+
+Check out the **[examples/](examples/)** directory for ready-to-use workflow examples:
+
+1. **Simple API Endpoint** - Basic webhook with JSON response
+2. **Daily Sales Report** - Scheduled Postgres query → Slack notification
+3. **User Registration API** - Complete CRUD with validation and error handling
+
+Each example includes:
+- ✅ Complete working workflow JSON
+- ✅ Documentation and setup instructions
+- ✅ Best practices and security tips
+- ✅ SQL schemas and configuration examples
+
+**[Browse Examples →](examples/README.md)**
+
 ## 📝 License
 
 MIT - Do whatever you want!

@@ -1,0 +1,105 @@
+{
+  "name": "Daily Sales Report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-node",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  DATE(created_at) as date,\n  COUNT(*) as orders,\n  SUM(amount) as revenue\nFROM orders\nWHERE created_at >= NOW() - INTERVAL '24 hours'\nGROUP BY DATE(created_at)",
+        "options": {}
+      },
+      "id": "postgres-node",
+      "name": "Fetch Sales Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json;\nconst date = data.date;\nconst orders = data.orders;\nconst revenue = data.revenue;\nconst avgOrder = revenue / orders;\n\nreturn [{\n  json: {\n    report: `📊 Daily Sales Report - ${date}\\n\\n` +\n            `Orders: ${orders}\\n` +\n            `Revenue: $${revenue.toFixed(2)}\\n` +\n            `Avg Order: $${avgOrder.toFixed(2)}`\n  }\n}];"
+      },
+      "id": "function-node",
+      "name": "Format Report",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#sales-team",
+        "text": "={{$json.report}}",
+        "options": {}
+      },
+      "id": "slack-node",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "slackApi": {
+          "id": "2",
+          "name": "Slack Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sales Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sales Data": {
+      "main": [
+        [
+          {
+            "node": "Format Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Report": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": []
+}
