@@ -1718,7 +1718,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     @server.call_tool()
     async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         """Handle tool calls"""
-        global node_recommender
+        nonlocal node_recommender
 
         try:
             if name == "suggest_workflow_nodes":
