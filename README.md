@@ -1416,73 +1416,11 @@ For detailed information about the template system, see:
 - Automatic caching and deduplication
 - Zero configuration required
 
-## 📦 Recent Updates
+## 📦 Version History
 
-### v1.17.1 - Security Detection Bugfix (2025-12-17)
-- **[Release Notes](releases/v1.17.1.md)**
-- 🐛 **CRITICAL FIX**: Fixed Bearer Token and Database URL detection
-- Added 2 Bearer Token patterns (RFC 6750 compliant)
-- Fixed overly aggressive whitelist patterns (test, example.com, localhost)
-- Detection improved from 0 → 6 secrets on vulnerable workflows
-- Secure workflows still correctly score 100/100 (A+)
+See **[CHANGELOG.md](CHANGELOG.md)** for complete version history and release notes.
 
-### v1.17.0 - Security Audits & Governance (2025-12-17)
-- **[Release Notes](releases/v1.17.0.md)**
-- 🔐 **NEW**: Enterprise-grade security auditing system
-- Detects 11 types of hardcoded secrets with 95%+ confidence
-- Authentication auditing (missing auth, weak auth, insecure transport)
-- Exposure analysis (public webhooks, data leaks, PII exposure)
-- Security scoring system (0-100 score with risk levels)
-- Compliance validation (Basic, Strict, Enterprise standards)
-- 4 new MCP tools: `audit_workflow_security`, `get_security_summary`, `check_compliance`, `get_critical_findings`
-
-### v1.16.1 - Critical FTS5 Bug Fix (2025-12-17)
-- **[Release Notes](releases/v1.16.1.md)**
-- 🐛 **CRITICAL FIX**: Fixed FTS5 duplicate entries bug that prevented GitHub templates from appearing in searches
-- FTS5 virtual tables don't handle `INSERT OR REPLACE` correctly - now using explicit DELETE before INSERT
-- GitHub templates now properly indexed and searchable
-- Added comprehensive logging for debugging template caching
-- All full-text search and category filters now work correctly
-
-### v1.16.0 - Dynamic Template Library (2025-12-17)
-- **[Release Notes](releases/v1.16.0.md)**
-- Added Intent-Based Matching Engine for semantic template search
-- Added GitHub Adapter for importing templates from GitHub repositories
-- Discover and import n8n workflows from public GitHub repos
-- 4 new MCP tools: `discover_github_templates`, `import_github_repo`, `search_templates_by_intent`, `explain_template_match`
-- Enhanced template metadata with complexity, node count, trigger types
-
-### v1.15.0 - Migration Engine (2025-12-17)
-- **[Release Notes](releases/v1.15.0.md)**
-- Added Migration Engine with 5 core components
-- 5 new MCP tools for compatibility checking and migration
-- 7 built-in migration rules for common n8n nodes
-- Dry-run preview and batch operations
-- Detailed migration reports and safety validation
-
-### v1.14.0 - Workflow Deletion (2025-12-16)
-- **[Release Notes](releases/v1.14.0.md)**
-- Added `delete_workflow` tool for safe workflow archiving
-- Complete CRUD operations now available
-- Audit trail logging for deletions
-
-### v1.13.2 - Critical Bugfix (2025-12-16)
-- **[Release Notes](releases/v1.13.2.md)**
-- Fixed critical bug in `update_workflow` that could cause data loss
-- Implemented smart merge logic for nodes and connections
-- Prevents accidental overwriting of entire workflows
-
-### v1.13.1 - Bugfixes (2025-12-16)
-- **[Release Notes](releases/v1.13.1.md)**
-- Fixed intent metadata integration issues
-- Corrected risk analysis intent retrieval
-- Fixed semantic analyzer method names
-
-### v1.13.0 - Intelligent Template System v2.0 (2025-12-16)
-- **[Release Notes](releases/v1.13.0.md)**
-- Multi-source template adapters
-- AI-powered template recommendations
-- Semantic matching and quality scoring
+**Latest Release**: [v1.18.0 - Drift Detection & Proactive Quality Monitoring](releases/v1.18.0.md)
 
 ## 📁 Example Workflows
 
