@@ -88,9 +88,14 @@ logger = logging.getLogger("n8n-workflow-builder")
 
 def create_n8n_server(api_url: str, api_key: str) -> Server:
     """Create the n8n workflow builder MCP server"""
+    import sys
+
+    print("DEBUG: create_n8n_server() started", file=sys.stderr, flush=True)
 
     server = Server("n8n-workflow-builder")
+    print("DEBUG: Server() created", file=sys.stderr, flush=True)
     n8n_client = N8nClient(api_url, api_key)
+    print("DEBUG: N8nClient created", file=sys.stderr, flush=True)
     workflow_builder = WorkflowBuilder()
     workflow_validator = WorkflowValidator()
     semantic_analyzer = SemanticWorkflowAnalyzer()
@@ -105,11 +110,13 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     template_registry = TemplateRegistry()
     template_adapter = TemplateAdapter()
     provenance_tracker = ProvenanceTracker()
-    
+
+    print("DEBUG: All components initialized, registering tools...", file=sys.stderr, flush=True)
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
         """List available n8n workflow tools"""
+        print("DEBUG: list_tools() called", file=sys.stderr, flush=True)
         return [
             Tool(
                 name="suggest_workflow_nodes",
@@ -3654,7 +3661,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             logger.error(f"Error in tool {name}: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return [TextContent(type="text", text=f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}")]
-    
+
+    print("DEBUG: All tool handlers registered", file=sys.stderr, flush=True)
 
     return server
 
