@@ -84,6 +84,8 @@ class SecretDetector:
             (r'glpat-[a-zA-Z0-9\-_]{20,}', 0.95),  # GitLab PAT
             (r'sk-[a-zA-Z0-9]{48}', 0.90),  # OpenAI API Key
             (r'xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}', 0.95),  # Slack Token
+            (r'Bearer\s+[A-Za-z0-9\-._~+/]+=*', 0.90),  # Bearer Token (RFC 6750)
+            (r'[Bb]earer["\s:]+([A-Za-z0-9\-._~+/]{20,})', 0.85),  # Bearer token in various formats
         ],
         SecretType.JWT: [
             (r'eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*', 0.85),
@@ -117,22 +119,23 @@ class SecretDetector:
     }
 
     # Patterns to ignore (false positives)
+    # NOTE: These must NOT match actual secrets! Be very specific.
     WHITELIST_PATTERNS = [
         r'\{\{.*\}\}',  # n8n expressions
         r'\$\{.*\}',    # Environment variables
         r'\$.*\$',      # Variables
         r'{{.*}}',      # Template variables
         r'<.*>',        # Placeholders
-        r'example\.com',
-        r'localhost',
-        r'127\.0\.0\.1',
-        r'0\.0\.0\.0',
+        r'^https?://[^:]*example\.com',  # Only URLs with example.com, not connection strings with credentials
+        r'^localhost$',  # Only "localhost" alone
+        r'^127\.0\.0\.1$',  # Only IP alone
+        r'^0\.0\.0\.0$',  # Only IP alone
         r'xxx+',
         r'\*{3,}',
-        r'test',
-        r'dummy',
-        r'placeholder',
-        r'your[_-]?',
+        r'^test$',      # Only "test" alone, not "sk_test_..."
+        r'^dummy$',     # Only "dummy" alone
+        r'^placeholder$',  # Only "placeholder" alone
+        r'^your[_-]?',  # Only at start
     ]
 
     # High-entropy strings are suspicious
