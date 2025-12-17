@@ -22,9 +22,21 @@ import os
 class NodeDiscovery:
     """Discovers node types and schemas from existing workflows"""
 
+    # Category mappings for node classification
+    NODE_CATEGORIES = {
+        'trigger': ['trigger', 'webhook', 'schedule', 'cron', 'manual'],
+        'data_source': ['sheets', 'airtable', 'database', 'postgres', 'mysql', 'mongodb', 'drive', 'dropbox', 's3'],
+        'transform': ['code', 'function', 'set', 'merge', 'split', 'aggregate', 'filter', 'sort'],
+        'notification': ['telegram', 'slack', 'discord', 'email', 'gmail', 'sms', 'twilio', 'matrix'],
+        'http': ['http', 'webhook', 'request', 'api'],
+        'logic': ['if', 'switch', 'router', 'compare', 'condition'],
+        'utility': ['wait', 'sticky', 'note', 'error', 'stop'],
+    }
+
     def __init__(self, db_path: Optional[str] = None):
         self.discovered_nodes = {}  # node_type -> NodeSchema
         self.node_usage_count = defaultdict(int)  # Track popularity
+        self.node_categories = {}  # node_type -> category
 
         # Database for persistence
         if db_path is None:
@@ -68,12 +80,28 @@ class NodeDiscovery:
             # Track usage
             self.node_usage_count[node_type] += 1
 
+            # Categorize node
+            if node_type not in self.node_categories:
+                self.node_categories[node_type] = self._categorize_node(node_type)
+
             # Extract schema if first time seeing this node
             if node_type not in self.discovered_nodes:
                 self.discovered_nodes[node_type] = self._extract_node_schema(node)
             else:
                 # Merge with existing schema (learn more parameters)
                 self._merge_node_schema(node_type, node)
+
+    def _categorize_node(self, node_type: str) -> str:
+        """Categorize a node based on its type name"""
+        node_type_lower = node_type.lower()
+
+        # Check against category keywords
+        for category, keywords in self.NODE_CATEGORIES.items():
+            for keyword in keywords:
+                if keyword in node_type_lower:
+                    return category
+
+        return 'other'
 
     def _extract_node_schema(self, node: Dict) -> Dict:
         """Extract schema from a node instance"""
@@ -169,7 +197,8 @@ class NodeDiscovery:
                     'name': schema.get('name'),
                     'usage_count': self.node_usage_count[node_type],
                     'parameters': len(schema.get('seen_parameters', [])),
-                    'typeVersion': schema.get('typeVersion', 1)
+                    'typeVersion': schema.get('typeVersion', 1),
+                    'category': self.node_categories.get(node_type, 'other')
                 })
 
         # Sort by usage count
@@ -330,8 +359,70 @@ class NodeRecommender:
         'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with'
     }
 
+    # Synonym mappings for common terms
+    SYNONYMS = {
+        # Messaging platforms
+        'slack': ['telegram', 'discord', 'mattermost', 'matrix', 'chat', 'message'],
+        'telegram': ['slack', 'discord', 'chat', 'message'],
+        'discord': ['slack', 'telegram', 'chat', 'message'],
+        'email': ['gmail', 'mail', 'smtp', 'imap'],
+        'gmail': ['email', 'mail'],
+
+        # Data sources
+        'spreadsheet': ['sheets', 'excel', 'airtable', 'table'],
+        'sheets': ['spreadsheet', 'excel', 'googlesheets'],
+        'excel': ['spreadsheet', 'sheets'],
+        'airtable': ['spreadsheet', 'table', 'database'],
+        'database': ['postgres', 'mysql', 'mongodb', 'sql', 'db'],
+        'postgres': ['postgresql', 'database', 'sql', 'db'],
+        'mysql': ['database', 'sql', 'db'],
+        'mongodb': ['mongo', 'database', 'nosql', 'db'],
+
+        # Actions
+        'send': ['post', 'push', 'publish', 'transmit'],
+        'receive': ['get', 'fetch', 'pull', 'retrieve'],
+        'read': ['get', 'fetch', 'retrieve', 'load'],
+        'write': ['save', 'store', 'update', 'create'],
+        'update': ['modify', 'change', 'edit', 'write'],
+        'delete': ['remove', 'drop', 'destroy'],
+
+        # File storage
+        'drive': ['googledrive', 'storage', 'cloud'],
+        'dropbox': ['storage', 'cloud', 'files'],
+        's3': ['aws', 'storage', 'cloud', 'bucket'],
+
+        # Triggers
+        'webhook': ['http', 'api', 'trigger'],
+        'schedule': ['cron', 'timer', 'interval'],
+        'trigger': ['webhook', 'event', 'start'],
+    }
+
     def __init__(self, discovery: NodeDiscovery):
         self.discovery = discovery
+        # Build reverse synonym map for faster lookup
+        self.expanded_synonyms = self._build_synonym_map()
+
+    def _build_synonym_map(self) -> Dict[str, List[str]]:
+        """Build expanded synonym map for efficient lookup"""
+        synonym_map = {}
+        for word, synonyms in self.SYNONYMS.items():
+            synonym_map[word] = synonyms
+        return synonym_map
+
+    def _get_expanded_keywords(self, keywords: List[str]) -> List[tuple]:
+        """
+        Expand keywords with synonyms
+        Returns: List of (keyword, weight) tuples where weight=1.0 for original, 0.5 for synonym
+        """
+        expanded = []
+        for keyword in keywords:
+            # Original keyword gets full weight
+            expanded.append((keyword, 1.0))
+            # Synonyms get half weight
+            if keyword in self.expanded_synonyms:
+                for synonym in self.expanded_synonyms[keyword]:
+                    expanded.append((synonym, 0.5))
+        return expanded
 
     def recommend_for_task(self, task_description: str, top_k: int = 5) -> List[Dict]:
         """
@@ -349,37 +440,62 @@ class NodeRecommender:
             word for word in task_description.lower().split()
             if word not in self.STOPWORDS and len(word) > 2
         ]
+
+        # Expand with synonyms
+        expanded_keywords = self._get_expanded_keywords(keywords)
+
         recommendations = []
 
         for node_type, schema in self.discovery.discovered_nodes.items():
             score = 0
             keyword_matches = []
+            synonym_matches = []
 
-            # Match keywords in node type (higher weight for exact matches)
             node_type_lower = node_type.lower()
-            for keyword in keywords:
+            node_name = schema.get('name', '').lower()
+            seen_parameters = schema.get('seen_parameters', [])
+
+            # Match keywords and synonyms in node type
+            for keyword, weight in expanded_keywords:
                 if keyword in node_type_lower:
                     # Exact word boundary match gets more points
                     if f".{keyword}" in node_type_lower or node_type_lower.endswith(keyword):
-                        score += 5  # Strong match (e.g., "slack" in "n8n-nodes-base.slack")
-                        keyword_matches.append(keyword)
+                        match_score = 5 * weight  # Strong match with weight
+                        score += match_score
+                        if weight == 1.0:
+                            keyword_matches.append(keyword)
+                        else:
+                            synonym_matches.append(keyword)
                     else:
-                        score += 2  # Partial match
-                        keyword_matches.append(keyword)
+                        match_score = 2 * weight  # Partial match with weight
+                        score += match_score
+                        if weight == 1.0:
+                            keyword_matches.append(keyword)
+                        else:
+                            synonym_matches.append(keyword)
 
             # Match keywords in node name
-            node_name = schema.get('name', '').lower()
-            for keyword in keywords:
+            for keyword, weight in expanded_keywords:
                 if keyword in node_name and keyword not in keyword_matches:
-                    score += 3
-                    keyword_matches.append(keyword)
+                    score += 3 * weight
+                    if weight == 1.0:
+                        keyword_matches.append(keyword)
+                    else:
+                        synonym_matches.append(keyword)
+
+            # Match keywords in parameters (bonus for nodes with relevant parameters)
+            for keyword, weight in expanded_keywords:
+                for param in seen_parameters:
+                    if keyword in param.lower():
+                        score += 1 * weight  # Smaller boost for parameter match
+                        break
 
             # Popularity boost (reduced - max 3 points instead of 5)
             usage = self.discovery.node_usage_count[node_type]
             popularity_score = min(usage / 50, 3.0)  # Cap at +3, slower growth
 
             # Only add popularity if there's at least some keyword match
-            if keyword_matches:
+            if keyword_matches or synonym_matches:
                 score += popularity_score
 
             if score > 0:
@@ -389,7 +505,8 @@ class NodeRecommender:
                     'score': score,
                     'usage_count': usage,
                     'keyword_matches': keyword_matches,
-                    'reason': self._generate_reason(keyword_matches, node_type, schema, popularity_score)
+                    'synonym_matches': synonym_matches,
+                    'reason': self._generate_reason(keyword_matches, synonym_matches, node_type, schema, popularity_score)
                 })
 
         # Sort by score, then by usage count as tiebreaker
@@ -397,15 +514,18 @@ class NodeRecommender:
 
         return recommendations[:top_k]
 
-    def _generate_reason(self, keyword_matches: List[str], node_type: str, schema: Dict, popularity_score: float) -> str:
+    def _generate_reason(self, keyword_matches: List[str], synonym_matches: List[str], node_type: str, schema: Dict, popularity_score: float) -> str:
         """Generate reason for recommendation"""
         reasons = []
 
         if keyword_matches:
-            reasons.append(f"Matches keywords: {', '.join(keyword_matches)}")
+            reasons.append(f"Matches: {', '.join(set(keyword_matches))}")
+
+        if synonym_matches:
+            reasons.append(f"Similar: {', '.join(set(synonym_matches))}")
 
         if popularity_score > 2.0:
-            reasons.append("highly popular in your workflows")
+            reasons.append("highly popular")
         elif popularity_score > 1.0:
             reasons.append("commonly used")
 

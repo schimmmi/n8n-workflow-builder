@@ -5371,9 +5371,24 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 result = f"# 🔎 Search Results for '{query}' ({len(matches)} matches)\n\n"
 
+                # Category icons
+                category_icons = {
+                    'trigger': '⚡',
+                    'data_source': '📊',
+                    'transform': '🔄',
+                    'notification': '📬',
+                    'http': '🌐',
+                    'logic': '🔀',
+                    'utility': '🔧',
+                    'other': '📦'
+                }
+
                 for match in matches:
-                    result += f"## {match['name'] or match['type']}\n"
+                    category = match.get('category', 'other')
+                    icon = category_icons.get(category, '📦')
+                    result += f"## {icon} {match['name'] or match['type']}\n"
                     result += f"- **Type:** `{match['type']}`\n"
+                    result += f"- **Category:** {category}\n"
                     result += f"- **Usage Count:** {match['usage_count']} times\n"
                     result += f"- **Parameters:** {match['parameters']} discovered\n"
                     result += f"- **Version:** {match['typeVersion']}\n"
