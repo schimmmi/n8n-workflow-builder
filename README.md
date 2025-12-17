@@ -58,7 +58,18 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Use Cases & Examples**: Practical examples for each node type
 - **Configuration Tips**: How to optimally configure each node
 
-### 🔬 Semantic Workflow Analysis (NEW!)
+### 🔐 Security Audits & Governance (NEW!)
+- **Hardcoded Secret Detection**: Finds API keys, passwords, tokens, AWS keys, private keys, JWTs, database credentials
+- **11 Secret Types**: Detects AWS keys, GitHub tokens, OpenAI keys, Slack tokens, database URLs, and more
+- **Entropy Analysis**: Uses Shannon entropy to detect high-entropy secrets (encrypted/encoded data)
+- **Authentication Auditing**: Checks for missing/weak authentication, insecure HTTP, Basic Auth over HTTP
+- **Exposure Analysis**: Identifies public webhooks, data leaks, PII exposure, CORS misconfigurations
+- **Security Scoring**: 0-100 score with risk levels (Critical, High, Medium, Low, Excellent)
+- **Compliance Validation**: Check workflows against Basic, Strict, or Enterprise standards
+- **Detailed Reports**: Markdown/JSON/Text reports with findings, recommendations, and remediation steps
+- **Priority Findings**: Get only critical/high severity issues for quick triage
+
+### 🔬 Semantic Workflow Analysis
 - **Deep Logic Analysis**: Goes beyond schema validation to understand workflow semantics
 - **12 Anti-Pattern Checks**: HTTP retry, loop completion, timezone config, IF paths, webhook security, infinite loops, credentials, N+1 queries, rate limiting, data validation, and more
 - **LLM-Friendly Fixes**: Copy-paste ready code fixes for AI agents
@@ -1379,6 +1390,16 @@ For detailed information about the template system, see:
 - Zero configuration required
 
 ## 📦 Recent Updates
+
+### v1.17.0 - Security Audits & Governance (2025-12-17)
+- **[Release Notes](releases/v1.17.0.md)**
+- 🔐 **NEW**: Enterprise-grade security auditing system
+- Detects 11 types of hardcoded secrets with 95%+ confidence
+- Authentication auditing (missing auth, weak auth, insecure transport)
+- Exposure analysis (public webhooks, data leaks, PII exposure)
+- Security scoring system (0-100 score with risk levels)
+- Compliance validation (Basic, Strict, Enterprise standards)
+- 4 new MCP tools: `audit_workflow_security`, `get_security_summary`, `check_compliance`, `get_critical_findings`
 
 ### v1.16.1 - Critical FTS5 Bug Fix (2025-12-17)
 - **[Release Notes](releases/v1.16.1.md)**

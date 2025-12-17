@@ -19,6 +19,7 @@ from .validators.workflow_validator import WorkflowValidator
 from .validators.semantic_analyzer import SemanticWorkflowAnalyzer
 from .analyzers.feedback_analyzer import AIFeedbackAnalyzer
 from .security.rbac import RBACManager
+from .security.audit import SecurityAuditor
 from .templates.recommender import TemplateRecommendationEngine, WORKFLOW_TEMPLATES
 from .builders.workflow_builder import WorkflowBuilder, NODE_KNOWLEDGE
 from .intent import IntentManager
@@ -82,6 +83,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     ai_feedback_analyzer = AIFeedbackAnalyzer()
     state_manager = StateManager()
     rbac_manager = RBACManager()
+    security_auditor = SecurityAuditor()
     template_engine = TemplateRecommendationEngine()
     intent_manager = IntentManager()
     approval_workflow = ApprovalWorkflow()
@@ -1461,6 +1463,94 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["query", "template_id"]
+                }
+            ),
+            # Security Audit & Governance Tools
+            Tool(
+                name="audit_workflow_security",
+                description=(
+                    "🔐 Run comprehensive security audit on a workflow. "
+                    "Detects hardcoded secrets (API keys, passwords, tokens), "
+                    "missing authentication, insecure webhooks, data exposure risks. "
+                    "Returns security score (0-100), risk level, and detailed findings. "
+                    "Enterprise-grade security auditing for compliance and governance."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to audit"
+                        },
+                        "format": {
+                            "type": "string",
+                            "description": "Report format (markdown, json, text)",
+                            "enum": ["markdown", "json", "text"],
+                            "default": "markdown"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="get_security_summary",
+                description=(
+                    "📊 Get concise security summary for a workflow. "
+                    "Quick overview of security score, risk level, and findings count. "
+                    "Useful for dashboards and quick checks."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="check_compliance",
+                description=(
+                    "✅ Check if workflow meets security compliance standards. "
+                    "Standards: basic (no critical findings), strict (no critical/high), "
+                    "enterprise (score >= 85, no critical/high, authenticated webhooks). "
+                    "Returns compliance status and violations list."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID"
+                        },
+                        "standard": {
+                            "type": "string",
+                            "description": "Compliance standard",
+                            "enum": ["basic", "strict", "enterprise"],
+                            "default": "basic"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="get_critical_findings",
+                description=(
+                    "🚨 Get only critical and high severity security findings. "
+                    "Filters out low/medium issues for quick triage. "
+                    "Returns secrets, authentication, and exposure issues."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID"
+                        }
+                    },
+                    "required": ["workflow_id"]
                 }
             )
         ]
@@ -4420,6 +4510,100 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += f"- **Action Types:** {', '.join(intent['action_types'])}\n"
                 if intent.get('domain'):
                     result += f"- **Domain:** {intent['domain']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            # Security Audit & Governance Handlers
+            elif name == "audit_workflow_security":
+                workflow_id = arguments["workflow_id"]
+                report_format = arguments.get("format", "markdown")
+
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                report, score = security_auditor.audit_and_report(
+                    workflow_data,
+                    format=report_format
+                )
+
+                return [TextContent(type="text", text=report)]
+
+            elif name == "get_security_summary":
+                workflow_id = arguments["workflow_id"]
+
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                summary = security_auditor.get_summary(workflow_data)
+
+                result = f"# 🔐 Security Summary\n\n"
+                result += f"**Workflow:** {summary['workflow_name']}\n"
+                result += f"**Score:** {summary['score']}/100 ({summary['grade']})\n"
+                result += f"**Risk Level:** {summary['risk_level'].upper()}\n\n"
+                result += f"**Total Findings:** {summary['total_findings']}\n\n"
+                result += "**By Category:**\n"
+                result += f"- Secrets: {summary['findings_by_category']['secrets']}\n"
+                result += f"- Authentication: {summary['findings_by_category']['authentication']}\n"
+                result += f"- Exposure: {summary['findings_by_category']['exposure']}\n\n"
+                result += "**By Severity:**\n"
+                result += f"- 🔴 Critical: {summary['findings_by_severity']['critical']}\n"
+                result += f"- 🟠 High: {summary['findings_by_severity']['high']}\n"
+                result += f"- 🟡 Medium: {summary['findings_by_severity']['medium']}\n"
+                result += f"- 🟢 Low: {summary['findings_by_severity']['low']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "check_compliance":
+                workflow_id = arguments["workflow_id"]
+                standard = arguments.get("standard", "basic")
+
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                is_compliant, violations = security_auditor.validate_compliance(
+                    workflow_data,
+                    standard=standard
+                )
+
+                result = f"# ✅ Compliance Check\n\n"
+                result += f"**Standard:** {standard.upper()}\n"
+                result += f"**Status:** {'✅ COMPLIANT' if is_compliant else '❌ NON-COMPLIANT'}\n\n"
+
+                if violations:
+                    result += "## Violations:\n\n"
+                    for violation in violations:
+                        result += f"- {violation}\n"
+                else:
+                    result += "✅ No violations found - workflow meets compliance standards.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_critical_findings":
+                workflow_id = arguments["workflow_id"]
+
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                findings = security_auditor.get_critical_findings(workflow_data)
+
+                total = (len(findings['secrets']) + len(findings['authentication']) +
+                        len(findings['exposure']))
+
+                result = f"# 🚨 Critical Security Findings\n\n"
+                result += f"**Total Critical/High Findings:** {total}\n\n"
+
+                if findings['secrets']:
+                    result += f"## 🔑 Hardcoded Secrets ({len(findings['secrets'])})\n\n"
+                    for f in findings['secrets']:
+                        result += f"- **{f.secret_type.value}** in `{f.node_name}`: {f.field_path}\n"
+                        result += f"  Confidence: {f.confidence:.0%}, Severity: {f.severity.value}\n\n"
+
+                if findings['authentication']:
+                    result += f"## 🔒 Authentication Issues ({len(findings['authentication'])})\n\n"
+                    for f in findings['authentication']:
+                        result += f"- **{f.issue_type.value}** in `{f.node_name}`\n"
+                        result += f"  {f.description}\n\n"
+
+                if findings['exposure']:
+                    result += f"## 🌐 Exposure Risks ({len(findings['exposure'])})\n\n"
+                    for f in findings['exposure']:
+                        result += f"- **{f.exposure_type.value}** in `{f.node_name}`\n"
+                        result += f"  Risk: {f.risk}\n\n"
+
+                if total == 0:
+                    result = "✅ No critical or high severity findings!"
 
                 return [TextContent(type="text", text=result)]
 
