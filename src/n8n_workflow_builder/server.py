@@ -3638,17 +3638,23 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 async def main():
     """Main entry point"""
     import sys
-    
+
     # Get configuration from environment
     api_url = os.getenv("N8N_API_URL")
     api_key = os.getenv("N8N_API_KEY")
-    
+
     if not api_url or not api_key:
         logger.error("N8N_API_URL and N8N_API_KEY environment variables must be set")
         sys.exit(1)
-    
+
     logger.info(f"Starting n8n Workflow Builder MCP Server... (API: {api_url})")
-    server = create_n8n_server(api_url, api_key)
+
+    try:
+        server = create_n8n_server(api_url, api_key)
+        logger.info("Server initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize server: {e}", exc_info=True)
+        sys.exit(1)
     
     # Run the server
     from mcp.server.stdio import stdio_server
