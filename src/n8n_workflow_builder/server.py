@@ -3,37 +3,56 @@
 n8n Workflow Builder MCP Server
 Advanced MCP server for n8n workflow creation, optimization, and management
 """
+import sys
+print("DEBUG: Starting server.py imports", file=sys.stderr, flush=True)
+
 import asyncio
 import json
 import logging
 import os
 from typing import Any
 
+print("DEBUG: Basic imports done", file=sys.stderr, flush=True)
+
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
+print("DEBUG: MCP imports done", file=sys.stderr, flush=True)
+
 # Import all components from refactored modules
+print("DEBUG: Starting module imports", file=sys.stderr, flush=True)
 from .client import N8nClient
+print("DEBUG: N8nClient imported", file=sys.stderr, flush=True)
 from .state import StateManager
+print("DEBUG: StateManager imported", file=sys.stderr, flush=True)
 from .validators.workflow_validator import WorkflowValidator
+print("DEBUG: WorkflowValidator imported", file=sys.stderr, flush=True)
 from .validators.semantic_analyzer import SemanticWorkflowAnalyzer
+print("DEBUG: SemanticWorkflowAnalyzer imported", file=sys.stderr, flush=True)
 from .analyzers.feedback_analyzer import AIFeedbackAnalyzer
+print("DEBUG: AIFeedbackAnalyzer imported", file=sys.stderr, flush=True)
 from .security.rbac import RBACManager
+print("DEBUG: RBACManager imported", file=sys.stderr, flush=True)
 from .templates.recommender import TemplateRecommendationEngine, WORKFLOW_TEMPLATES
+print("DEBUG: TemplateRecommendationEngine imported", file=sys.stderr, flush=True)
 from .builders.workflow_builder import WorkflowBuilder, NODE_KNOWLEDGE
+print("DEBUG: WorkflowBuilder imported", file=sys.stderr, flush=True)
 from .intent import IntentManager
+print("DEBUG: IntentManager imported", file=sys.stderr, flush=True)
 from .execution.error_analyzer import (
     ExecutionMonitor,
     ErrorContextExtractor,
     ErrorSimplifier,
     FeedbackGenerator
 )
+print("DEBUG: error_analyzer imported", file=sys.stderr, flush=True)
 from .drift.detector import (
     DriftDetector,
     DriftPatternAnalyzer,
     DriftRootCauseAnalyzer,
     DriftFixSuggester
 )
+print("DEBUG: drift.detector imported", file=sys.stderr, flush=True)
 from .explainability import (
     WorkflowExplainer,
     WorkflowPurposeAnalyzer,
@@ -42,6 +61,7 @@ from .explainability import (
     RiskAnalyzer,
     ExplainabilityFormatter
 )
+print("DEBUG: explainability imported", file=sys.stderr, flush=True)
 from .changes import (
     WorkflowDiffEngine,
     ChangeImpactAnalyzer,
@@ -49,6 +69,7 @@ from .changes import (
     ApprovalWorkflow,
     ChangeFormatter
 )
+print("DEBUG: changes imported", file=sys.stderr, flush=True)
 from .templates import (
     TemplateRegistry,
     TemplateIntentExtractor,
@@ -56,6 +77,9 @@ from .templates import (
     TemplateAdapter,
     ProvenanceTracker
 )
+print("DEBUG: templates imported", file=sys.stderr, flush=True)
+
+print("DEBUG: All imports completed successfully!", file=sys.stderr, flush=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
