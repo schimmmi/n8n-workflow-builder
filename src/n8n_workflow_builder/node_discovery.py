@@ -343,22 +343,34 @@ class NodeRecommender:
 
         for node_type, schema in self.discovery.discovered_nodes.items():
             score = 0
+            keyword_matches = []
 
-            # Match keywords in node type
+            # Match keywords in node type (higher weight for exact matches)
             node_type_lower = node_type.lower()
             for keyword in keywords:
                 if keyword in node_type_lower:
-                    score += 2
+                    # Exact word boundary match gets more points
+                    if f".{keyword}" in node_type_lower or node_type_lower.endswith(keyword):
+                        score += 5  # Strong match (e.g., "slack" in "n8n-nodes-base.slack")
+                        keyword_matches.append(keyword)
+                    else:
+                        score += 2  # Partial match
+                        keyword_matches.append(keyword)
 
             # Match keywords in node name
             node_name = schema.get('name', '').lower()
             for keyword in keywords:
-                if keyword in node_name:
-                    score += 1
+                if keyword in node_name and keyword not in keyword_matches:
+                    score += 3
+                    keyword_matches.append(keyword)
 
-            # Boost by usage count (popular nodes are more reliable)
+            # Popularity boost (reduced - max 3 points instead of 5)
             usage = self.discovery.node_usage_count[node_type]
-            score += min(usage / 10, 5)  # Cap at +5
+            popularity_score = min(usage / 50, 3.0)  # Cap at +3, slower growth
+
+            # Only add popularity if there's at least some keyword match
+            if keyword_matches:
+                score += popularity_score
 
             if score > 0:
                 recommendations.append({
@@ -366,24 +378,28 @@ class NodeRecommender:
                     'name': schema.get('name'),
                     'score': score,
                     'usage_count': usage,
-                    'reason': self._generate_reason(keywords, node_type, schema)
+                    'keyword_matches': keyword_matches,
+                    'reason': self._generate_reason(keyword_matches, node_type, schema, popularity_score)
                 })
 
-        # Sort by score
-        recommendations.sort(key=lambda x: x['score'], reverse=True)
+        # Sort by score, then by usage count as tiebreaker
+        recommendations.sort(key=lambda x: (x['score'], x['usage_count']), reverse=True)
 
         return recommendations[:top_k]
 
-    def _generate_reason(self, keywords: List[str], node_type: str, schema: Dict) -> str:
+    def _generate_reason(self, keyword_matches: List[str], node_type: str, schema: Dict, popularity_score: float) -> str:
         """Generate reason for recommendation"""
-        matched = []
-        for keyword in keywords:
-            if keyword in node_type.lower():
-                matched.append(keyword)
-            elif keyword in schema.get('name', '').lower():
-                matched.append(keyword)
+        reasons = []
 
-        if matched:
-            return f"Matches: {', '.join(matched)}"
+        if keyword_matches:
+            reasons.append(f"Matches keywords: {', '.join(keyword_matches)}")
 
-        return "Popular node for similar tasks"
+        if popularity_score > 2.0:
+            reasons.append("highly popular in your workflows")
+        elif popularity_score > 1.0:
+            reasons.append("commonly used")
+
+        if reasons:
+            return " • ".join(reasons)
+
+        return "Potential match"
