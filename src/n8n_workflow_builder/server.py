@@ -3,56 +3,37 @@
 n8n Workflow Builder MCP Server
 Advanced MCP server for n8n workflow creation, optimization, and management
 """
-import sys
-print("DEBUG: Starting server.py imports", file=sys.stderr, flush=True)
-
 import asyncio
 import json
 import logging
 import os
 from typing import Any
 
-print("DEBUG: Basic imports done", file=sys.stderr, flush=True)
-
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 
-print("DEBUG: MCP imports done", file=sys.stderr, flush=True)
-
 # Import all components from refactored modules
-print("DEBUG: Starting module imports", file=sys.stderr, flush=True)
 from .client import N8nClient
-print("DEBUG: N8nClient imported", file=sys.stderr, flush=True)
 from .state import StateManager
-print("DEBUG: StateManager imported", file=sys.stderr, flush=True)
 from .validators.workflow_validator import WorkflowValidator
-print("DEBUG: WorkflowValidator imported", file=sys.stderr, flush=True)
 from .validators.semantic_analyzer import SemanticWorkflowAnalyzer
-print("DEBUG: SemanticWorkflowAnalyzer imported", file=sys.stderr, flush=True)
 from .analyzers.feedback_analyzer import AIFeedbackAnalyzer
-print("DEBUG: AIFeedbackAnalyzer imported", file=sys.stderr, flush=True)
 from .security.rbac import RBACManager
-print("DEBUG: RBACManager imported", file=sys.stderr, flush=True)
 from .templates.recommender import TemplateRecommendationEngine, WORKFLOW_TEMPLATES
-print("DEBUG: TemplateRecommendationEngine imported", file=sys.stderr, flush=True)
 from .builders.workflow_builder import WorkflowBuilder, NODE_KNOWLEDGE
-print("DEBUG: WorkflowBuilder imported", file=sys.stderr, flush=True)
 from .intent import IntentManager
-print("DEBUG: IntentManager imported", file=sys.stderr, flush=True)
 from .execution.error_analyzer import (
     ExecutionMonitor,
     ErrorContextExtractor,
     ErrorSimplifier,
     FeedbackGenerator
 )
-print("DEBUG: error_analyzer imported", file=sys.stderr, flush=True)
 from .drift.detector import (
     DriftDetector,
     DriftPatternAnalyzer,
     DriftRootCauseAnalyzer,
     DriftFixSuggester
 )
-print("DEBUG: drift.detector imported", file=sys.stderr, flush=True)
 from .explainability import (
     WorkflowExplainer,
     WorkflowPurposeAnalyzer,
@@ -61,7 +42,6 @@ from .explainability import (
     RiskAnalyzer,
     ExplainabilityFormatter
 )
-print("DEBUG: explainability imported", file=sys.stderr, flush=True)
 from .changes import (
     WorkflowDiffEngine,
     ChangeImpactAnalyzer,
@@ -69,7 +49,6 @@ from .changes import (
     ApprovalWorkflow,
     ChangeFormatter
 )
-print("DEBUG: changes imported", file=sys.stderr, flush=True)
 from .templates import (
     TemplateRegistry,
     TemplateIntentExtractor,
@@ -77,9 +56,6 @@ from .templates import (
     TemplateAdapter,
     ProvenanceTracker
 )
-print("DEBUG: templates imported", file=sys.stderr, flush=True)
-
-print("DEBUG: All imports completed successfully!", file=sys.stderr, flush=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -88,14 +64,9 @@ logger = logging.getLogger("n8n-workflow-builder")
 
 def create_n8n_server(api_url: str, api_key: str) -> Server:
     """Create the n8n workflow builder MCP server"""
-    import sys
-
-    print("DEBUG: create_n8n_server() started", file=sys.stderr, flush=True)
 
     server = Server("n8n-workflow-builder")
-    print("DEBUG: Server() created", file=sys.stderr, flush=True)
     n8n_client = N8nClient(api_url, api_key)
-    print("DEBUG: N8nClient created", file=sys.stderr, flush=True)
     workflow_builder = WorkflowBuilder()
     workflow_validator = WorkflowValidator()
     semantic_analyzer = SemanticWorkflowAnalyzer()
@@ -111,12 +82,9 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     template_adapter = TemplateAdapter()
     provenance_tracker = ProvenanceTracker()
 
-    print("DEBUG: All components initialized, registering tools...", file=sys.stderr, flush=True)
-
     @server.list_tools()
     async def list_tools() -> list[Tool]:
         """List available n8n workflow tools"""
-        print("DEBUG: list_tools() called", file=sys.stderr, flush=True)
         return [
             Tool(
                 name="suggest_workflow_nodes",
@@ -3662,8 +3630,6 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return [TextContent(type="text", text=f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}")]
 
-    print("DEBUG: All tool handlers registered", file=sys.stderr, flush=True)
-
     return server
 
 
@@ -3671,29 +3637,21 @@ async def main():
     """Main entry point"""
     import sys
 
-    print("DEBUG: main() started", file=sys.stderr, flush=True)
-
     # Get configuration from environment
     api_url = os.getenv("N8N_API_URL")
     api_key = os.getenv("N8N_API_KEY")
 
-    print(f"DEBUG: Got env vars: API_URL={api_url is not None}, API_KEY={api_key is not None}", file=sys.stderr, flush=True)
-
     if not api_url or not api_key:
         logger.error("N8N_API_URL and N8N_API_KEY environment variables must be set")
-        print("ERROR: Missing env vars", file=sys.stderr, flush=True)
         sys.exit(1)
 
     logger.info(f"Starting n8n Workflow Builder MCP Server... (API: {api_url})")
-    print(f"DEBUG: Starting server initialization", file=sys.stderr, flush=True)
 
     try:
         server = create_n8n_server(api_url, api_key)
-        print("DEBUG: Server created successfully", file=sys.stderr, flush=True)
         logger.info("Server initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize server: {e}", exc_info=True)
-        print(f"ERROR: Server init failed: {e}", file=sys.stderr, flush=True)
         import traceback
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)
@@ -3701,16 +3659,12 @@ async def main():
     # Run the server
     from mcp.server.stdio import stdio_server
 
-    print("DEBUG: About to start stdio_server", file=sys.stderr, flush=True)
-
     async with stdio_server() as (read_stream, write_stream):
-        print("DEBUG: stdio_server started, calling server.run()", file=sys.stderr, flush=True)
         await server.run(
             read_stream,
             write_stream,
             server.create_initialization_options()
         )
-        print("DEBUG: server.run() completed", file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":
