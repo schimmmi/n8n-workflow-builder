@@ -284,6 +284,16 @@ MIGRATION_RULES = [
         transform=migrate_set_v1_to_v2,
         severity="low"
     ),
+    MigrationRule(
+        rule_id="set_v3_3_to_v3_4",
+        name="Set v3.3 → v3.4",
+        description="Migrate Set node from version 3.3 to 3.4 (bug fixes)",
+        node_type="n8n-nodes-base.set",
+        from_version=3.3,
+        to_version=3.4,
+        transform=lambda node: node,  # Just version bump
+        severity="low"
+    ),
 
     # Function node migrations
     MigrationRule(

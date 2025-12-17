@@ -178,7 +178,7 @@
       }
     },
     "n8n-nodes-base.set": {
-      "current_version": 3.3,
+      "current_version": 3.4,
       "versions": {
         "1.0": {
           "status": "deprecated",
@@ -210,6 +210,10 @@
           "issues": []
         },
         "3.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.4": {
           "status": "compatible",
           "issues": []
         }
@@ -300,7 +304,7 @@
       }
     },
     "n8n-nodes-base.googleSheets": {
-      "current_version": 4.4,
+      "current_version": 4.5,
       "versions": {
         "3.0": {
           "status": "deprecated",
@@ -333,6 +337,10 @@
         "4.4": {
           "status": "compatible",
           "issues": []
+        },
+        "4.5": {
+          "status": "compatible",
+          "issues": []
         }
       }
     },
@@ -354,7 +362,7 @@
       }
     },
     "@n8n/n8n-nodes-langchain.agent": {
-      "current_version": 1.5,
+      "current_version": 1.9,
       "versions": {
         "1.0": {
           "status": "deprecated",
@@ -385,6 +393,294 @@
           "issues": []
         },
         "1.5": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.6": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.7": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.8": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.9": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.toolWorkflow": {
+      "current_version": 1.1,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.toolCode": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.toolCalculator": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.toolHttpRequest": {
+      "current_version": 1.1,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.memoryBufferWindow": {
+      "current_version": 1.3,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.outputParserItemList": {
+      "current_version": 1.3,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.chainSummarization": {
+      "current_version": 1.4,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.4": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.documentDefaultDataLoader": {
+      "current_version": 1.1,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.vectorStoreInMemory": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.embeddingsOpenAi": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.lmChatOpenAi": {
+      "current_version": 1.6,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.4": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.5": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.6": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.manualTrigger": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.scheduleTrigger": {
+      "current_version": 1.2,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.merge": {
+      "current_version": 3.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.210.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Merge mode configuration changed in v2.",
+              "fix": "Review merge configuration"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "deprecated",
+          "deprecated_since": "1.0.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "low",
+              "message": "Enhanced merge options available in v3.",
+              "fix": "Consider upgrading to v3"
+            }
+          ]
+        },
+        "3.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.splitInBatches": {
+      "current_version": 3.0,
+      "versions": {
+        "1.0": {
+          "status": "deprecated",
+          "deprecated_since": "0.200.0",
+          "issues": [
+            {
+              "type": "deprecated_feature",
+              "severity": "medium",
+              "message": "Batch configuration changed in newer versions.",
+              "fix": "Review batch settings"
+            }
+          ]
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.executeWorkflow": {
+      "current_version": 1.1,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
           "status": "compatible",
           "issues": []
         }
@@ -447,9 +743,15 @@
     }
   },
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "last_updated": "2025-12-17",
-    "total_nodes": 14,
-    "description": "n8n Node Compatibility Database - Tracks breaking changes, deprecated parameters, and migration paths"
+    "total_nodes": 30,
+    "description": "n8n Node Compatibility Database - Tracks breaking changes, deprecated parameters, and migration paths",
+    "coverage": {
+      "core_nodes": 14,
+      "langchain_nodes": 12,
+      "trigger_nodes": 2,
+      "logic_nodes": 2
+    }
   }
 }
