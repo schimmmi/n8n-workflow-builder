@@ -139,6 +139,16 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **Semantic Understanding**: "AI analysis" matches "machine learning", "telegram" matches "notification"
 - **Transparent Matching**: Shows WHY templates match with detailed explanations
 
+### 🔄 Migration Engine (NEW!)
+- **Automatic Compatibility Checking**: Detects deprecated nodes and parameters in workflows
+- **Smart Migration Rules**: 7 built-in rules for common n8n nodes (HTTP, Postgres, Slack, etc.)
+- **Version Detection**: Identifies compatibility issues with current n8n versions
+- **Dry-Run Mode**: Preview changes before applying migrations
+- **Batch Operations**: Check multiple workflows at once with summary statistics
+- **Severity Levels**: Prioritize fixes by impact (critical, high, medium, low)
+- **Safe Transformations**: Validates migrations to prevent data loss
+- **Detailed Reports**: Complete before/after comparison and migration logs
+
 ## 🎯 Use Cases
 
 ### 1. From Workflow Idea to Finished Structure
@@ -248,7 +258,83 @@ Testing Recommendations:
 ✅ Verify error rate drops below 5%
 ```
 
-### 6. Workflow Explainability (NEW!)
+### 6. Migration Engine (NEW!)
+```
+You: "Check my workflow for compatibility issues"
+
+Claude + MCP: Uses check_workflow_compatibility
+✅ Compatibility Check Complete
+
+Status: DEPRECATED (contains deprecated features)
+
+Issues Found:
+1. [HIGH] HTTP Request node (v2) - Parameter 'url' deprecated, use 'requestUrl'
+2. [HIGH] HTTP Request node (v2) - Parameter 'method' deprecated, use 'requestMethod'
+3. [MEDIUM] Slack node (v1) - Message formatting structure changed in v2
+4. [LOW] Set node (v1) - New options structure in v2
+
+Recommendation: Run migration to update nodes to latest versions
+```
+
+```
+You: "Show me what would change if I migrate this workflow"
+
+Claude + MCP: Uses get_migration_preview
+
+Migration Preview:
+
+Node: Send API Request (HTTP Request v2 → v3)
+Changes:
+  - parameters.url → parameters.requestUrl
+  - parameters.method → parameters.requestMethod
+  - authentication moved to credentials field
+
+Node: Notify Team (Slack v1 → v2)
+Changes:
+  - parameters.message.text → parameters.text
+  - parameters.message.attachments → parameters.blocks
+  - markdown enabled by default
+
+Total Changes: 2 nodes, 6 parameters
+Risk Level: MEDIUM
+```
+
+```
+You: "Migrate the workflow with dry-run first"
+
+Claude + MCP: Uses migrate_workflow (dry_run=true)
+
+Dry-Run Migration Complete ✅
+
+Changes Applied (preview only):
+✓ HTTP Request v2 → v3 (Send API Request)
+✓ Slack v1 → v2 (Notify Team)
+✓ Set v1 → v2 (Format Data)
+
+Validation: PASSED
+All connections preserved
+No data loss detected
+
+Ready to apply? Run without dry_run=true
+```
+
+```
+You: "Apply the migration"
+
+Claude + MCP: Uses migrate_workflow
+
+Migration Applied Successfully! ✅
+
+Updated Nodes:
+✓ Send API Request (HTTP Request v3)
+✓ Notify Team (Slack v2)
+✓ Format Data (Set v2)
+
+Workflow updated and saved
+Test execution recommended
+```
+
+### 7. Workflow Explainability (NEW!)
 ```
 You: "I need to document the 'Payment Processing' workflow for our SOC 2 audit"
 
@@ -325,7 +411,7 @@ Total Impact: 3 workflows, 6 nodes affected
 Recommendation: Plan maintenance window and notify stakeholders
 ```
 
-### 7. Change Simulation & Safe Deployments (NEW!)
+### 8. Change Simulation & Safe Deployments (NEW!)
 ```
 You: "I want to update the Payment Processing workflow to use the new Stripe API v2"
 
@@ -781,6 +867,43 @@ Claude uses: analyze_intent_coverage
 → Critical nodes missing intent: Payment Gateway, Error Handler
 ```
 
+### Migration Engine (NEW!)
+```
+You: "Check workflow abc123 for compatibility issues"
+
+Claude uses: check_workflow_compatibility
+→ Compatibility report with severity levels and recommendations
+```
+
+```
+You: "What migrations are available for HTTP Request node?"
+
+Claude uses: get_available_migrations
+→ Lists all migration rules for HTTP Request (v2→v3, v3→v4)
+```
+
+```
+You: "Migrate workflow abc123 to latest versions"
+
+Claude uses: migrate_workflow
+→ Applies migrations, validates changes, updates workflow
+```
+
+```
+You: "Show preview of migration for workflow xyz789"
+
+Claude uses: get_migration_preview
+→ Before/after comparison without applying changes
+```
+
+```
+You: "Check all workflows for compatibility"
+
+Claude uses: batch_check_compatibility
+→ Summary: X compatible, Y deprecated, Z breaking
+→ Prioritized list of workflows needing updates
+```
+
 ### Execution Monitoring (NEW!)
 ```
 You: "Watch the execution of workflow 'API Sync'"
@@ -1192,6 +1315,20 @@ For detailed information about execution monitoring, see:
 - Pattern analysis across multiple executions
 - Fix suggestions with confidence scores
 
+## 🔄 Migration Engine Deep Dive
+
+For detailed information about the migration system, see:
+- **[Migration Engine Documentation](docs/MIGRATION.md)** - Complete migration guide
+
+**Quick summary:**
+- Automatic node compatibility checking
+- Rule-based transformations for node version upgrades
+- 7 built-in migration rules (HTTP Request, Postgres, Slack, Function, Webhook, Set)
+- Dry-run mode for safe previews
+- Batch compatibility checks across all workflows
+- Severity-based issue prioritization (critical, high, medium, low)
+- Validates migrations to prevent data loss
+
 ## 📖 Explainability Layer Deep Dive
 
 For detailed information about the explainability layer, see:
@@ -1242,6 +1379,14 @@ For detailed information about the template system, see:
 - Zero configuration required
 
 ## 📦 Recent Updates
+
+### v1.15.0 - Migration Engine (2025-12-17)
+- **[Release Notes](releases/v1.15.0.md)**
+- Added Migration Engine with 5 core components
+- 5 new MCP tools for compatibility checking and migration
+- 7 built-in migration rules for common n8n nodes
+- Dry-run preview and batch operations
+- Detailed migration reports and safety validation
 
 ### v1.14.0 - Workflow Deletion (2025-12-16)
 - **[Release Notes](releases/v1.14.0.md)**
