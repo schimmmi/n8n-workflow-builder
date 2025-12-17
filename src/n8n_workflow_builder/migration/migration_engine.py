@@ -70,7 +70,7 @@ class MigrationEngine:
         workflow: Dict,
         target_version: Optional[int] = None,
         dry_run: bool = False
-    ) -> Dict:
+    ) -> tuple[Dict, List[Dict]]:
         """
         Migrate entire workflow to target version
 
@@ -80,7 +80,7 @@ class MigrationEngine:
             dry_run: If True, don't modify original workflow
 
         Returns:
-            Migrated workflow (or copy if dry_run)
+            Tuple of (migrated_workflow, migration_log)
         """
         if dry_run:
             workflow = copy.deepcopy(workflow)
@@ -89,6 +89,11 @@ class MigrationEngine:
         migration_log = []
 
         for node in workflow.get("nodes", []):
+            # Skip None or invalid nodes
+            if node is None or not isinstance(node, dict):
+                logger.warning(f"Skipping invalid node: {node}")
+                continue
+
             migrated_node, log = self.migrate_node(node, target_version)
             migrated_nodes.append(migrated_node)
             if log:
@@ -106,7 +111,7 @@ class MigrationEngine:
                 "changes": len(migration_log)
             }
 
-        return workflow
+        return workflow, migration_log
 
     def migrate_node(
         self,
@@ -123,6 +128,11 @@ class MigrationEngine:
         Returns:
             Tuple of (migrated_node, migration_log)
         """
+        # Defensive check
+        if not node or not isinstance(node, dict):
+            logger.warning(f"Invalid node passed to migrate_node: {node}")
+            return node, []
+
         node_type = node.get("type", "")
         current_version = node.get("typeVersion", 1)
 

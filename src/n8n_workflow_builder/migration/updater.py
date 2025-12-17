@@ -54,10 +54,7 @@ class WorkflowUpdater:
 
         # Migrate workflow
         logger.info(f"Auto-migrating workflow: {workflow.get('name', 'Unknown')}")
-        updated_workflow = self.migration_engine.migrate_workflow(workflow, dry_run=dry_run)
-
-        # Get migration log from metadata
-        migration_log = updated_workflow.get("meta", {}).get("lastMigration", {})
+        updated_workflow, migration_log = self.migration_engine.migrate_workflow(workflow, dry_run=dry_run)
 
         # Re-check compatibility after migration
         new_compatibility = self.version_checker.check_workflow_compatibility(updated_workflow)
@@ -94,7 +91,7 @@ class WorkflowUpdater:
         compatibility = self.version_checker.check_workflow_compatibility(workflow)
 
         # Dry run migration
-        updated_workflow = self.migration_engine.migrate_workflow(workflow, dry_run=True)
+        updated_workflow, migration_log = self.migration_engine.migrate_workflow(workflow, dry_run=True)
 
         # Calculate changes
         changes = []
