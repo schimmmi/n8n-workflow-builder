@@ -324,6 +324,12 @@ class NodeDiscovery:
 class NodeRecommender:
     """Recommends nodes based on discovered usage patterns"""
 
+    # Common stopwords to ignore in matching
+    STOPWORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+        'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with'
+    }
+
     def __init__(self, discovery: NodeDiscovery):
         self.discovery = discovery
 
@@ -338,7 +344,11 @@ class NodeRecommender:
         Returns:
             List of recommended nodes with scores
         """
-        keywords = task_description.lower().split()
+        # Filter out stopwords and short words
+        keywords = [
+            word for word in task_description.lower().split()
+            if word not in self.STOPWORDS and len(word) > 2
+        ]
         recommendations = []
 
         for node_type, schema in self.discovery.discovered_nodes.items():
