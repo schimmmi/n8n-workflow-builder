@@ -86,7 +86,7 @@ github_enescingoz_awesome_n8n_templates_ai product imagines|2
 
 ### After Fix (with rebuild)
 ```bash
-$ python3 rebuild_fts5.py
+$ python3 scripts/utils/rebuild_fts5.py
 ✅ FTS5 index rebuilt! 21 templates indexed
 
 $ sqlite3 template_cache.db "SELECT id, COUNT(*) FROM templates_fts GROUP BY id HAVING COUNT(*) > 1"
@@ -116,7 +116,7 @@ $ sqlite3 template_cache.db "SELECT id, COUNT(*) FROM templates_fts GROUP BY id 
 Existing installations need to rebuild the FTS5 index to remove duplicates:
 
 ```bash
-python3 rebuild_fts5.py
+python3 scripts/utils/rebuild_fts5.py
 ```
 
 Or via MCP tool:
