@@ -168,6 +168,7 @@ class MigrationEngine:
     ) -> List[MigrationRule]:
         """
         Find rules that should be applied for this migration
+        Builds a chain of rules to go from current_version to target_version
 
         Args:
             node_type: Node type
@@ -179,20 +180,41 @@ class MigrationEngine:
         """
         rules = self._rules_by_node_type.get(node_type, [])
 
+        if not rules:
+            return []
+
         # If no target version specified, migrate to latest
         if target_version is None:
             target_version = max((r.to_version for r in rules), default=current_version)
 
-        # Find rules that apply to this version range
-        applicable = [
-            rule for rule in rules
-            if rule.from_version == current_version and rule.to_version <= target_version
-        ]
+        # Already at or past target version
+        if current_version >= target_version:
+            return []
 
-        # Sort by from_version to apply in order
-        applicable.sort(key=lambda r: r.from_version)
+        # Build migration chain using BFS
+        path = []
+        current = current_version
 
-        return applicable
+        # Try to find a path from current to target
+        while current < target_version:
+            # Find the next rule that upgrades from current version
+            next_rule = None
+
+            for rule in rules:
+                if rule.from_version == current and rule.to_version <= target_version:
+                    # Found a valid next step
+                    if next_rule is None or rule.to_version < next_rule.to_version:
+                        # Prefer smaller steps for more granular control
+                        next_rule = rule
+
+            if next_rule is None:
+                # No path found - return what we have so far
+                break
+
+            path.append(next_rule)
+            current = next_rule.to_version
+
+        return path
 
     def get_migration_path(
         self,

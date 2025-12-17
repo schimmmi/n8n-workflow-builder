@@ -191,9 +191,31 @@ def migrate_function_v1_to_v2(node: Dict) -> Dict:
     return node
 
 
+# HTTP Request Node: v1 -> v2
+def migrate_http_v1_to_v2(node: Dict) -> Dict:
+    """
+    Migrate HTTP Request node from v1 to v2
+    - Same parameter structure, but version bump
+    - Prepare for v2 deprecations
+    """
+    # v1 to v2 is mostly a version bump
+    # The actual parameter changes happen in v2 to v3
+    return node
+
+
 # Create migration rules
 MIGRATION_RULES = [
     # HTTP Request migrations
+    MigrationRule(
+        rule_id="http_v1_to_v2",
+        name="HTTP Request v1 → v2",
+        description="Migrate HTTP Request node from version 1 to 2",
+        node_type="n8n-nodes-base.httpRequest",
+        from_version=1,
+        to_version=2,
+        transform=migrate_http_v1_to_v2,
+        severity="medium"
+    ),
     MigrationRule(
         rule_id="http_v2_to_v3",
         name="HTTP Request v2 → v3",
