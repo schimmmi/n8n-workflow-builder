@@ -1,0 +1,300 @@
+"""
+Workflow-Based Node Discovery
+
+Since n8n API doesn't expose node-types endpoints in all versions,
+we learn about nodes by analyzing existing workflows.
+
+This gives us:
+- Which nodes are available (used in workflows)
+- Which operations/parameters each node supports
+- Common parameter patterns
+- Credential requirements
+"""
+
+from typing import Dict, List, Set, Optional
+from collections import defaultdict
+import json
+
+
+class NodeDiscovery:
+    """Discovers node types and schemas from existing workflows"""
+
+    def __init__(self):
+        self.discovered_nodes = {}  # node_type -> NodeSchema
+        self.node_usage_count = defaultdict(int)  # Track popularity
+
+    def analyze_workflows(self, workflows: List[Dict]) -> Dict:
+        """
+        Analyze multiple workflows to discover node types and patterns
+
+        Args:
+            workflows: List of workflow objects from n8n API
+
+        Returns:
+            Summary of discovered nodes
+        """
+        for workflow in workflows:
+            self._analyze_workflow(workflow)
+
+        return self.get_summary()
+
+    def _analyze_workflow(self, workflow: Dict):
+        """Analyze a single workflow"""
+        nodes = workflow.get('nodes', [])
+
+        for node in nodes:
+            node_type = node.get('type')
+            if not node_type:
+                continue
+
+            # Track usage
+            self.node_usage_count[node_type] += 1
+
+            # Extract schema if first time seeing this node
+            if node_type not in self.discovered_nodes:
+                self.discovered_nodes[node_type] = self._extract_node_schema(node)
+            else:
+                # Merge with existing schema (learn more parameters)
+                self._merge_node_schema(node_type, node)
+
+    def _extract_node_schema(self, node: Dict) -> Dict:
+        """Extract schema from a node instance"""
+        return {
+            'type': node.get('type'),
+            'name': node.get('name'),
+            'typeVersion': node.get('typeVersion', 1),
+            'parameters': self._extract_parameters(node),
+            'credentials': self._extract_credentials(node),
+            'position': node.get('position'),
+            # Track all parameter keys we've seen
+            'seen_parameters': set(node.get('parameters', {}).keys()),
+            # Track parameter value types
+            'parameter_types': self._infer_parameter_types(node.get('parameters', {})),
+        }
+
+    def _merge_node_schema(self, node_type: str, node: Dict):
+        """Merge new node instance with existing schema"""
+        existing = self.discovered_nodes[node_type]
+
+        # Add new parameters we haven't seen before
+        new_params = set(node.get('parameters', {}).keys())
+        existing['seen_parameters'].update(new_params)
+
+        # Update parameter types
+        param_types = self._infer_parameter_types(node.get('parameters', {}))
+        for key, value_type in param_types.items():
+            if key not in existing['parameter_types']:
+                existing['parameter_types'][key] = value_type
+
+    def _extract_parameters(self, node: Dict) -> Dict:
+        """Extract parameters from node"""
+        return node.get('parameters', {})
+
+    def _extract_credentials(self, node: Dict) -> Optional[Dict]:
+        """Extract credentials info from node"""
+        return node.get('credentials')
+
+    def _infer_parameter_types(self, parameters: Dict) -> Dict:
+        """Infer types of parameter values"""
+        types = {}
+        for key, value in parameters.items():
+            if isinstance(value, bool):
+                types[key] = 'boolean'
+            elif isinstance(value, int):
+                types[key] = 'number'
+            elif isinstance(value, str):
+                types[key] = 'string'
+            elif isinstance(value, list):
+                types[key] = 'array'
+            elif isinstance(value, dict):
+                types[key] = 'object'
+            else:
+                types[key] = 'unknown'
+        return types
+
+    def get_summary(self) -> Dict:
+        """Get summary of discovered nodes"""
+        return {
+            'total_node_types': len(self.discovered_nodes),
+            'total_usage': sum(self.node_usage_count.values()),
+            'node_types': list(self.discovered_nodes.keys()),
+            'most_used': sorted(
+                self.node_usage_count.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:10]
+        }
+
+    def get_node_schema(self, node_type: str) -> Optional[Dict]:
+        """Get schema for a specific node type"""
+        schema = self.discovered_nodes.get(node_type)
+        if not schema:
+            return None
+
+        # Convert sets to lists for JSON serialization
+        result = schema.copy()
+        result['seen_parameters'] = list(result['seen_parameters'])
+        result['usage_count'] = self.node_usage_count[node_type]
+
+        return result
+
+    def search_nodes(self, query: str) -> List[Dict]:
+        """Search for nodes by keyword"""
+        query_lower = query.lower()
+        matches = []
+
+        for node_type, schema in self.discovered_nodes.items():
+            if (query_lower in node_type.lower() or
+                query_lower in schema.get('name', '').lower()):
+                matches.append({
+                    'type': node_type,
+                    'name': schema.get('name'),
+                    'usage_count': self.node_usage_count[node_type],
+                    'parameters': len(schema.get('seen_parameters', [])),
+                    'typeVersion': schema.get('typeVersion', 1)
+                })
+
+        # Sort by usage count
+        matches.sort(key=lambda x: x['usage_count'], reverse=True)
+
+        return matches
+
+    def get_node_examples(self, node_type: str, workflows: List[Dict]) -> List[Dict]:
+        """Get example usages of a node type from workflows"""
+        examples = []
+
+        for workflow in workflows:
+            for node in workflow.get('nodes', []):
+                if node.get('type') == node_type:
+                    examples.append({
+                        'workflow_name': workflow.get('name', 'Unknown'),
+                        'workflow_id': workflow.get('id'),
+                        'node_name': node.get('name'),
+                        'parameters': node.get('parameters', {}),
+                        'credentials': node.get('credentials')
+                    })
+
+                    # Limit to 5 examples
+                    if len(examples) >= 5:
+                        return examples
+
+        return examples
+
+    def get_parameter_insights(self, node_type: str) -> Dict:
+        """Get insights about parameters for a node type"""
+        schema = self.discovered_nodes.get(node_type)
+        if not schema:
+            return {}
+
+        return {
+            'all_parameters': list(schema.get('seen_parameters', [])),
+            'parameter_types': schema.get('parameter_types', {}),
+            'total_variations': len(schema.get('seen_parameters', [])),
+            'usage_count': self.node_usage_count[node_type]
+        }
+
+    def get_popular_nodes(self, limit: int = 20) -> List[Dict]:
+        """Get most commonly used nodes"""
+        popular = []
+
+        for node_type, count in sorted(
+            self.node_usage_count.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:limit]:
+            schema = self.discovered_nodes.get(node_type, {})
+            popular.append({
+                'type': node_type,
+                'name': schema.get('name', node_type),
+                'usage_count': count,
+                'parameters': len(schema.get('seen_parameters', [])),
+            })
+
+        return popular
+
+    def export_knowledge(self) -> Dict:
+        """Export all discovered knowledge as JSON"""
+        export = {
+            'summary': self.get_summary(),
+            'nodes': {}
+        }
+
+        for node_type, schema in self.discovered_nodes.items():
+            export['nodes'][node_type] = {
+                'name': schema.get('name'),
+                'typeVersion': schema.get('typeVersion'),
+                'usage_count': self.node_usage_count[node_type],
+                'parameters': list(schema.get('seen_parameters', [])),
+                'parameter_types': schema.get('parameter_types', {}),
+                'credentials': schema.get('credentials')
+            }
+
+        return export
+
+
+class NodeRecommender:
+    """Recommends nodes based on discovered usage patterns"""
+
+    def __init__(self, discovery: NodeDiscovery):
+        self.discovery = discovery
+
+    def recommend_for_task(self, task_description: str, top_k: int = 5) -> List[Dict]:
+        """
+        Recommend nodes for a task based on keywords
+
+        Args:
+            task_description: Natural language description of task
+            top_k: Number of recommendations
+
+        Returns:
+            List of recommended nodes with scores
+        """
+        keywords = task_description.lower().split()
+        recommendations = []
+
+        for node_type, schema in self.discovery.discovered_nodes.items():
+            score = 0
+
+            # Match keywords in node type
+            node_type_lower = node_type.lower()
+            for keyword in keywords:
+                if keyword in node_type_lower:
+                    score += 2
+
+            # Match keywords in node name
+            node_name = schema.get('name', '').lower()
+            for keyword in keywords:
+                if keyword in node_name:
+                    score += 1
+
+            # Boost by usage count (popular nodes are more reliable)
+            usage = self.discovery.node_usage_count[node_type]
+            score += min(usage / 10, 5)  # Cap at +5
+
+            if score > 0:
+                recommendations.append({
+                    'type': node_type,
+                    'name': schema.get('name'),
+                    'score': score,
+                    'usage_count': usage,
+                    'reason': self._generate_reason(keywords, node_type, schema)
+                })
+
+        # Sort by score
+        recommendations.sort(key=lambda x: x['score'], reverse=True)
+
+        return recommendations[:top_k]
+
+    def _generate_reason(self, keywords: List[str], node_type: str, schema: Dict) -> str:
+        """Generate reason for recommendation"""
+        matched = []
+        for keyword in keywords:
+            if keyword in node_type.lower():
+                matched.append(keyword)
+            elif keyword in schema.get('name', '').lower():
+                matched.append(keyword)
+
+        if matched:
+            return f"Matches: {', '.join(matched)}"
+
+        return "Popular node for similar tasks"

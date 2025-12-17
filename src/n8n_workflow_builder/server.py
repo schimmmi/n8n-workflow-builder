@@ -70,6 +70,7 @@ from .migration import (
     MigrationReporter,
     MIGRATION_RULES
 )
+from .node_discovery import NodeDiscovery, NodeRecommender
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -101,6 +102,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     # Migration System
     workflow_updater = WorkflowUpdater(MIGRATION_RULES)
     migration_reporter = MigrationReporter()
+
+    # Node Discovery System (learns from workflows)
+    node_discovery = NodeDiscovery()
+    node_recommender = None  # Initialized after first workflow analysis
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -1641,11 +1646,12 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 }
             ),
             Tool(
-                name="get_node_types",
+                name="discover_nodes",
                 description=(
-                    "📦 Get list of all available n8n node types. "
-                    "Returns node names, display names, descriptions, and versions. "
-                    "Use this to discover what nodes are available in your n8n instance."
+                    "📦 Discover node types by analyzing existing workflows. "
+                    "Learns from your workflows to find which nodes are available and used. "
+                    "Returns discovered nodes with usage statistics and popularity. "
+                    "Run this periodically to update node knowledge."
                 ),
                 inputSchema={
                     "type": "object",
@@ -1653,13 +1659,12 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 }
             ),
             Tool(
-                name="get_node_type_schema",
+                name="get_node_schema",
                 description=(
-                    "🔍 Get detailed schema for a specific node type. "
-                    "Returns all available operations, parameters, credentials, and options. "
-                    "Essential for understanding what a node can do and how to configure it. "
-                    "Includes: operations list, parameter definitions, credential requirements, "
-                    "dynamic options, input/output schemas."
+                    "🔍 Get discovered schema for a specific node type. "
+                    "Returns parameters, credentials, and examples learned from workflows. "
+                    "Shows which parameters are used in practice and their types. "
+                    "Includes real-world usage examples from your workflows."
                 ),
                 inputSchema={
                     "type": "object",
@@ -1673,11 +1678,11 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 }
             ),
             Tool(
-                name="search_node_types",
+                name="search_nodes",
                 description=(
-                    "🔎 Search for node types by keyword. "
+                    "🔎 Search discovered nodes by keyword. "
                     "Find nodes related to specific services or functionality. "
-                    "Searches in node names, display names, and descriptions."
+                    "Results sorted by popularity (usage count)."
                 ),
                 inputSchema={
                     "type": "object",
@@ -1688,6 +1693,24 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["query"]
+                }
+            ),
+            Tool(
+                name="recommend_nodes_for_task",
+                description=(
+                    "💡 Get node recommendations for a specific task. "
+                    "Uses workflow-learned patterns to suggest appropriate nodes. "
+                    "Considers node popularity and relevance to your task description."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "task_description": {
+                            "type": "string",
+                            "description": "What you want to accomplish (e.g., 'send slack message', 'query database')"
+                        }
+                    },
+                    "required": ["task_description"]
                 }
             )
         ]
