@@ -4122,7 +4122,6 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 if not template:
                     # Try from old template engine
-                    from .templates.recommender import WORKFLOW_TEMPLATES
                     if template_id in WORKFLOW_TEMPLATES:
                         template_dict = WORKFLOW_TEMPLATES[template_id]
                         from .templates.sources.base import TemplateMetadata
