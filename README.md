@@ -1391,6 +1391,14 @@ For detailed information about the template system, see:
 
 ## 📦 Recent Updates
 
+### v1.17.1 - Security Detection Bugfix (2025-12-17)
+- **[Release Notes](releases/v1.17.1.md)**
+- 🐛 **CRITICAL FIX**: Fixed Bearer Token and Database URL detection
+- Added 2 Bearer Token patterns (RFC 6750 compliant)
+- Fixed overly aggressive whitelist patterns (test, example.com, localhost)
+- Detection improved from 0 → 6 secrets on vulnerable workflows
+- Secure workflows still correctly score 100/100 (A+)
+
 ### v1.17.0 - Security Audits & Governance (2025-12-17)
 - **[Release Notes](releases/v1.17.0.md)**
 - 🔐 **NEW**: Enterprise-grade security auditing system
