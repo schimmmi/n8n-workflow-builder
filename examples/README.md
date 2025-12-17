@@ -2,6 +2,19 @@
 
 This directory contains ready-to-use n8n workflow examples that demonstrate common patterns and best practices.
 
+## 💬 Need Help with Prompts?
+
+Check out **[PROMPTS.md](PROMPTS.md)** for a comprehensive guide on how to effectively use Claude with the n8n Workflow Builder:
+
+- 📝 100+ example prompts for every use case
+- 🎯 Best practices for clear communication
+- 🔄 Multi-step workflow examples
+- 💡 Tips for debugging and optimization
+
+**[View Prompt Examples →](PROMPTS.md)**
+
+---
+
 ## 🚀 Available Examples
 
 ### 1. Simple API Endpoint
