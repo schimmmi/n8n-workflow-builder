@@ -2613,35 +2613,99 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             elif name == "get_template_details":
                 template_id = arguments["template_id"]
 
-                if template_id not in WORKFLOW_TEMPLATES:
-                    available = ", ".join(WORKFLOW_TEMPLATES.keys())
-                    return [TextContent(
-                        type="text",
-                        text=f"❌ Template '{template_id}' not found.\n\nAvailable templates: {available}"
-                    )]
+                # Try new template registry first
+                template = await template_registry.get_template(template_id)
 
-                template = WORKFLOW_TEMPLATES[template_id]
+                if not template:
+                    # Try old WORKFLOW_TEMPLATES as fallback
+                    if template_id in WORKFLOW_TEMPLATES:
+                        template_dict = WORKFLOW_TEMPLATES[template_id]
 
-                result = f"# 📄 Template Details: {template['name']}\n\n"
+                        result = f"# 📄 Template Details: {template_dict['name']}\n\n"
+                        result += f"**Template ID:** `{template_id}`\n"
+                        result += f"**Category:** {template_dict.get('category', 'N/A')}\n"
+                        result += f"**Difficulty:** {template_dict.get('difficulty', 'N/A')}\n"
+                        result += f"**Estimated Time:** {template_dict.get('estimated_time', 'N/A')}\n\n"
+                        result += f"## Description\n\n{template_dict.get('description', 'N/A')}\n\n"
+
+                        result += f"## Use Cases\n\n"
+                        for uc in template_dict.get('use_cases', []):
+                            result += f"- {uc}\n"
+                        result += "\n"
+
+                        result += f"## Node Structure\n\n"
+                        for idx, node in enumerate(template_dict.get('nodes', []), 1):
+                            result += f"{idx}. **{node['name']}** (`{node['type']}`)\n"
+                        result += "\n"
+
+                        result += f"## Tags\n\n"
+                        result += ", ".join(f"`{tag}`" for tag in template_dict.get('tags', []))
+                        result += "\n\n"
+
+                        result += f"## Implementation Guide\n\n"
+                        result += f"1. Use this template as a starting point for your workflow\n"
+                        result += f"2. Customize node names and parameters to match your requirements\n"
+                        result += f"3. Configure credentials for nodes that require authentication\n"
+                        result += f"4. Test with sample data before deploying to production\n"
+                        result += f"5. Add error handling and monitoring as needed\n\n"
+
+                        result += f"💡 **Tip:** Use `generate_workflow_template` with `template_type='{template_id}'` "
+                        result += f"to get a detailed outline with this template.\n"
+
+                        return [TextContent(type="text", text=result)]
+                    else:
+                        # Template not found anywhere
+                        available = ", ".join(WORKFLOW_TEMPLATES.keys())
+                        return [TextContent(
+                            type="text",
+                            text=f"❌ Template '{template_id}' not found.\n\nAvailable templates: {available}"
+                        )]
+
+                # Use new template metadata
+                result = f"# 📄 Template Details: {template.name}\n\n"
                 result += f"**Template ID:** `{template_id}`\n"
-                result += f"**Category:** {template.get('category', 'N/A')}\n"
-                result += f"**Difficulty:** {template.get('difficulty', 'N/A')}\n"
-                result += f"**Estimated Time:** {template.get('estimated_time', 'N/A')}\n\n"
-                result += f"## Description\n\n{template.get('description', 'N/A')}\n\n"
+                result += f"**Source:** {template.source}\n"
+                result += f"**Category:** {template.category}\n"
+                result += f"**Complexity:** {template.complexity}\n"
+                result += f"**Estimated Time:** {template.estimated_setup_time}\n"
+                result += f"**Node Count:** {template.node_count}\n\n"
 
-                result += f"## Use Cases\n\n"
-                for uc in template.get('use_cases', []):
-                    result += f"- {uc}\n"
-                result += "\n"
+                result += f"## Description\n\n{template.description}\n\n"
+
+                if template.purpose:
+                    result += f"## Purpose\n\n{template.purpose}\n\n"
+
+                if template.external_systems:
+                    result += f"## External Systems\n\n"
+                    result += ", ".join(f"`{sys}`" for sys in template.external_systems)
+                    result += "\n\n"
 
                 result += f"## Node Structure\n\n"
-                for idx, node in enumerate(template.get('nodes', []), 1):
-                    result += f"{idx}. **{node['name']}** (`{node['type']}`)\n"
+                for idx, node in enumerate(template.nodes, 1):
+                    node_name = node.get('name', 'Unknown')
+                    node_type = node.get('type', 'Unknown')
+                    result += f"{idx}. **{node_name}** (`{node_type}`)\n"
                 result += "\n"
 
                 result += f"## Tags\n\n"
-                result += ", ".join(f"`{tag}`" for tag in template.get('tags', []))
+                result += ", ".join(f"`{tag}`" for tag in template.tags)
                 result += "\n\n"
+
+                # Quality indicators
+                if template.has_error_handling or template.has_documentation:
+                    result += f"## Quality Indicators\n\n"
+                    if template.has_error_handling:
+                        result += "✅ Has error handling\n"
+                    if template.has_documentation:
+                        result += "✅ Has documentation\n"
+                    result += "\n"
+
+                # Trust metrics
+                if template.success_rate is not None:
+                    result += f"## Metrics\n\n"
+                    result += f"- **Success Rate:** {template.success_rate * 100:.0f}%\n"
+                    result += f"- **Usage Count:** {template.usage_count}\n"
+                    result += "\n"
 
                 result += f"## Implementation Guide\n\n"
                 result += f"1. Use this template as a starting point for your workflow\n"
@@ -2649,9 +2713,6 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 result += f"3. Configure credentials for nodes that require authentication\n"
                 result += f"4. Test with sample data before deploying to production\n"
                 result += f"5. Add error handling and monitoring as needed\n\n"
-
-                result += f"💡 **Tip:** Use `generate_workflow_template` with `template_type='{template_id}'` "
-                result += f"to get a detailed outline with this template.\n"
 
                 return [TextContent(type="text", text=result)]
 
