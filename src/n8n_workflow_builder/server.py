@@ -35,6 +35,11 @@ from .drift.detector import (
     DriftRootCauseAnalyzer,
     DriftFixSuggester
 )
+from .drift.analyzers import (
+    SchemaDriftAnalyzer,
+    RateLimitDriftAnalyzer,
+    DataQualityDriftAnalyzer
+)
 from .explainability import (
     WorkflowExplainer,
     WorkflowPurposeAnalyzer,
@@ -952,6 +957,21 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID"}},"required":["workflow_id"]}
             ),
             Tool(
+                name="detect_schema_drift",
+                description="📋 Detect API schema changes: missing fields, type changes, structure changes. Identifies breaking API changes before they cause failures.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to analyze"},"lookback_days":{"type":"number","description":"Days of history to analyze (default: 30)","default":30}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="detect_rate_limit_drift",
+                description="⏱️ Detect rate limit issues: 429 errors, quota proximity, throughput degradation. Identifies when workflows are hitting API limits.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to analyze"},"lookback_days":{"type":"number","description":"Days of history to analyze (default: 30)","default":30}},"required":["workflow_id"]}
+            ),
+            Tool(
+                name="detect_quality_drift",
+                description="📊 Detect data quality degradation: empty values, format violations, completeness issues. Identifies when data quality is declining.",
+                inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to analyze"},"lookback_days":{"type":"number","description":"Days of history to analyze (default: 30)","default":30}},"required":["workflow_id"]}
+            ),
+            Tool(
                 name="explain_workflow",
                 description="📖 Generate comprehensive workflow explanation: purpose, data flow, dependencies, risks. Perfect for audit, onboarding, and documentation.",
                 inputSchema={"type":"object","properties":{"workflow_id":{"type":"string","description":"Workflow ID to explain"},"format":{"type":"string","description":"Output format: markdown, json, or text (default: markdown)","default":"markdown"},"include_analysis":{"type":"boolean","description":"Include semantic analysis and execution history (default: true)","default":True}},"required":["workflow_id"]}
@@ -1541,6 +1561,73 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     "🚨 Get only critical and high severity security findings. "
                     "Filters out low/medium issues for quick triage. "
                     "Returns secrets, authentication, and exposure issues."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID"
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="detect_workflow_drift",
+                description=(
+                    "📊 Detect workflow drift and degradation over time. "
+                    "Analyzes execution history to detect: success rate drops, "
+                    "performance degradation, new error patterns, API changes, "
+                    "rate limit issues, schema drift, and data quality issues. "
+                    "Provides root cause analysis and fix suggestions. "
+                    "Requires at least 10+ executions for accurate analysis."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to analyze"
+                        },
+                        "min_executions": {
+                            "type": "integer",
+                            "description": "Minimum executions to analyze (default: 20)",
+                            "default": 20
+                        }
+                    },
+                    "required": ["workflow_id"]
+                }
+            ),
+            Tool(
+                name="analyze_drift_pattern",
+                description=(
+                    "🔬 Deep analysis of a specific drift pattern. "
+                    "Takes a drift pattern and provides detailed insights, "
+                    "change point detection, potential causes, and recommendations."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID"
+                        },
+                        "pattern_type": {
+                            "type": "string",
+                            "description": "Pattern type to analyze",
+                            "enum": ["success_rate_drift", "performance_drift", "new_error_pattern", "error_frequency_drift"]
+                        }
+                    },
+                    "required": ["workflow_id", "pattern_type"]
+                }
+            ),
+            Tool(
+                name="get_drift_fix_suggestions",
+                description=(
+                    "🔧 Get fix suggestions for detected drift issues. "
+                    "Provides actionable recommendations based on root cause analysis. "
+                    "Includes node-specific fixes, configuration changes, and best practices."
                 ),
                 inputSchema={
                     "type": "object",
@@ -3234,6 +3321,195 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 return [TextContent(type="text", text=result)]
 
+            elif name == "detect_schema_drift":
+                workflow_id = arguments["workflow_id"]
+                lookback_days = arguments.get("lookback_days", 30)
+
+                # Fetch workflow and executions
+                workflow = await n8n_client.get_workflow(workflow_id)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
+
+                if not executions or len(executions) < 2:
+                    return [TextContent(
+                        type="text",
+                        text=f"ℹ️ Insufficient execution history for schema drift detection (need at least 2 executions)"
+                    )]
+
+                # Analyze schema drift
+                from .drift import SchemaDriftAnalyzer
+                drift_analysis = SchemaDriftAnalyzer.analyze_schema_drift(executions)
+
+                # Format result
+                result = f"# Schema Drift Detection: {workflow['name']}\n\n"
+
+                if not drift_analysis.get("drift_detected"):
+                    result += "✅ **No schema drift detected**\n\n"
+                    result += "API response schemas appear stable.\n"
+                    return [TextContent(type="text", text=result)]
+
+                severity = drift_analysis.get("severity", "info")
+                severity_emoji = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(severity, "ℹ️")
+
+                result += f"{severity_emoji} **Schema Drift Detected - Severity: {severity.upper()}**\n\n"
+
+                # Show summary
+                summary = drift_analysis.get("summary", {})
+                result += "## Summary\n\n"
+                result += f"- Missing fields: {summary.get('missing_fields', 0)}\n"
+                result += f"- New fields: {summary.get('new_fields', 0)}\n"
+                result += f"- Type changes: {summary.get('type_changes', 0)}\n"
+                result += f"- Null rate increases: {summary.get('null_rate_increases', 0)}\n\n"
+
+                # Show patterns
+                patterns = drift_analysis.get("patterns", [])
+                if patterns:
+                    result += "## 🔍 Detected Changes\n\n"
+                    for pattern in patterns[:10]:  # Limit to first 10
+                        severity_icon = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(pattern.get("severity"), "ℹ️")
+                        result += f"{severity_icon} **{pattern.get('type')}**\n"
+                        result += f"- {pattern.get('description')}\n\n"
+
+                # Show fix suggestions
+                fixes = SchemaDriftAnalyzer.suggest_schema_fixes(drift_analysis, workflow)
+                if fixes:
+                    result += "## 💡 Suggested Fixes\n\n"
+                    for fix in fixes[:5]:  # Limit to top 5
+                        result += f"- {fix.get('suggestion')}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "detect_rate_limit_drift":
+                workflow_id = arguments["workflow_id"]
+                lookback_days = arguments.get("lookback_days", 30)
+
+                # Fetch workflow and executions
+                workflow = await n8n_client.get_workflow(workflow_id)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
+
+                if not executions or len(executions) < 2:
+                    return [TextContent(
+                        type="text",
+                        text=f"ℹ️ Insufficient execution history for rate limit drift detection (need at least 2 executions)"
+                    )]
+
+                # Analyze rate limit drift
+                from .drift import RateLimitDriftAnalyzer
+                drift_analysis = RateLimitDriftAnalyzer.analyze_rate_limit_drift(executions, workflow)
+
+                # Format result
+                result = f"# Rate Limit Drift Detection: {workflow['name']}\n\n"
+
+                if not drift_analysis.get("drift_detected"):
+                    result += "✅ **No rate limit issues detected**\n\n"
+                    result += "Workflow throughput and API limits appear stable.\n"
+                    return [TextContent(type="text", text=result)]
+
+                severity = drift_analysis.get("severity", "info")
+                severity_emoji = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(severity, "ℹ️")
+
+                result += f"{severity_emoji} **Rate Limit Issues Detected - Severity: {severity.upper()}**\n\n"
+
+                # Show metrics comparison
+                baseline = drift_analysis.get("baseline_period", {})
+                current = drift_analysis.get("current_period", {})
+
+                result += "## Metrics Comparison\n\n"
+                result += f"**Rate Limit Errors:**\n"
+                result += f"- Baseline: {baseline.get('rate_limit_errors', 0)} errors\n"
+                result += f"- Current: {current.get('rate_limit_errors', 0)} errors\n\n"
+
+                result += f"**Throughput:**\n"
+                result += f"- Baseline: {baseline.get('throughput_per_hour', 0):.1f} exec/hour\n"
+                result += f"- Current: {current.get('throughput_per_hour', 0):.1f} exec/hour\n\n"
+
+                # Show patterns
+                patterns = drift_analysis.get("patterns", [])
+                if patterns:
+                    result += "## 🔍 Detected Issues\n\n"
+                    for pattern in patterns:
+                        severity_icon = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(pattern.get("severity"), "ℹ️")
+                        result += f"{severity_icon} **{pattern.get('type')}**\n"
+                        result += f"- {pattern.get('description')}\n\n"
+
+                # Show fix suggestions
+                fixes = RateLimitDriftAnalyzer.suggest_rate_limit_fixes(drift_analysis, workflow)
+                if fixes:
+                    result += "## 💡 Suggested Fixes\n\n"
+                    for fix in fixes[:5]:  # Limit to top 5
+                        result += f"- {fix.get('suggestion')}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "detect_quality_drift":
+                workflow_id = arguments["workflow_id"]
+                lookback_days = arguments.get("lookback_days", 30)
+
+                # Fetch workflow and executions
+                workflow = await n8n_client.get_workflow(workflow_id)
+                executions = await n8n_client.get_executions(workflow_id, limit=100)
+
+                if not executions or len(executions) < 2:
+                    return [TextContent(
+                        type="text",
+                        text=f"ℹ️ Insufficient execution history for quality drift detection (need at least 2 executions)"
+                    )]
+
+                # Analyze data quality drift
+                from .drift import DataQualityDriftAnalyzer
+                drift_analysis = DataQualityDriftAnalyzer.analyze_quality_drift(executions)
+
+                # Format result
+                result = f"# Data Quality Drift Detection: {workflow['name']}\n\n"
+
+                if not drift_analysis.get("drift_detected"):
+                    result += "✅ **No data quality issues detected**\n\n"
+                    result += "Data quality appears stable.\n"
+                    return [TextContent(type="text", text=result)]
+
+                severity = drift_analysis.get("severity", "info")
+                severity_emoji = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(severity, "ℹ️")
+
+                result += f"{severity_emoji} **Quality Issues Detected - Severity: {severity.upper()}**\n\n"
+
+                # Show summary
+                summary = drift_analysis.get("summary", {})
+                result += "## Summary\n\n"
+                result += f"- Empty value issues: {summary.get('empty_value_issues', 0)}\n"
+                result += f"- Completeness issues: {summary.get('completeness_issues', 0)}\n"
+                result += f"- Format validation issues: {summary.get('format_issues', 0)}\n"
+                result += f"- Consistency issues: {summary.get('consistency_issues', 0)}\n\n"
+
+                # Show metrics comparison
+                baseline = drift_analysis.get("baseline_period", {})
+                current = drift_analysis.get("current_period", {})
+
+                result += "## Quality Metrics\n\n"
+                result += f"**Completeness:**\n"
+                result += f"- Baseline: {baseline.get('completeness', 0):.1%}\n"
+                result += f"- Current: {current.get('completeness', 0):.1%}\n\n"
+
+                result += f"**Avg Output Size:**\n"
+                result += f"- Baseline: {baseline.get('avg_output_size', 0):.1f} items\n"
+                result += f"- Current: {current.get('avg_output_size', 0):.1f} items\n\n"
+
+                # Show patterns
+                patterns = drift_analysis.get("patterns", [])
+                if patterns:
+                    result += "## 🔍 Detected Issues\n\n"
+                    for pattern in patterns[:10]:  # Limit to first 10
+                        severity_icon = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}.get(pattern.get("severity"), "ℹ️")
+                        result += f"{severity_icon} **{pattern.get('type')}**\n"
+                        result += f"- {pattern.get('description')}\n\n"
+
+                # Show fix suggestions
+                fixes = DataQualityDriftAnalyzer.suggest_quality_fixes(drift_analysis, workflow)
+                if fixes:
+                    result += "## 💡 Suggested Fixes\n\n"
+                    for fix in fixes[:5]:  # Limit to top 5
+                        result += f"- {fix.get('suggestion')}\n"
+
+                return [TextContent(type="text", text=result)]
+
             elif name == "explain_workflow":
                 workflow_id = arguments["workflow_id"]
                 format_type = arguments.get("format", "markdown")
@@ -4604,6 +4880,250 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 if total == 0:
                     result = "✅ No critical or high severity findings!"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "detect_workflow_drift":
+                workflow_id = arguments["workflow_id"]
+                min_executions = arguments.get("min_executions", 20)
+
+                # Fetch workflow and execution history
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                executions = await n8n_client.get_workflow_executions(workflow_id)
+
+                if len(executions) < min_executions:
+                    return [TextContent(
+                        type="text",
+                        text=f"⚠️ Insufficient execution history: {len(executions)} executions found, need at least {min_executions} for reliable drift detection."
+                    )]
+
+                # Run general drift detection
+                drift_analysis = DriftDetector.analyze_execution_history(executions)
+
+                # Run specialized analyzers
+                schema_drift = SchemaDriftAnalyzer.analyze_schema_drift(executions)
+                rate_limit_drift = RateLimitDriftAnalyzer.analyze_rate_limit_drift(executions, workflow_data)
+                quality_drift = DataQualityDriftAnalyzer.analyze_quality_drift(executions)
+
+                # Generate report
+                result = f"# 📊 Drift Detection Report: {workflow_data.get('name', workflow_id)}\n\n"
+                result += f"**Executions Analyzed:** {len(executions)}\n\n"
+
+                # General drift
+                if drift_analysis["drift_detected"]:
+                    result += f"## 🔴 General Drift Detected (Severity: {drift_analysis['severity']})\n\n"
+                    for pattern in drift_analysis["patterns"]:
+                        severity_emoji = {"critical": "🔴", "warning": "⚠️", "info": "ℹ️"}
+                        result += f"{severity_emoji.get(pattern['severity'], '•')} **{pattern['type']}**: {pattern['description']}\n\n"
+                else:
+                    result += "✅ No general drift detected\n\n"
+
+                # Schema drift
+                if schema_drift["drift_detected"]:
+                    result += f"## 🗂️ Schema Drift Detected (Severity: {schema_drift['severity']})\n\n"
+                    summary = schema_drift.get("summary", {})
+                    if summary.get("missing_fields"):
+                        result += f"- Missing fields: {summary['missing_fields']}\n"
+                    if summary.get("type_changes"):
+                        result += f"- Type changes: {summary['type_changes']}\n"
+                    if summary.get("null_rate_increases"):
+                        result += f"- Null rate increases: {summary['null_rate_increases']}\n"
+                    result += "\n"
+
+                # Rate limit drift
+                if rate_limit_drift["drift_detected"]:
+                    result += f"## ⏱️ Rate Limit Drift Detected (Severity: {rate_limit_drift['severity']})\n\n"
+                    summary = rate_limit_drift.get("summary", {})
+                    if summary.get("rate_limit_error_increase"):
+                        result += "- Rate limit errors increased significantly\n"
+                    if summary.get("throughput_degradation"):
+                        result += "- Workflow throughput degraded\n"
+                    result += "\n"
+
+                # Quality drift
+                if quality_drift["drift_detected"]:
+                    result += f"## 🎯 Data Quality Drift Detected (Severity: {quality_drift['severity']})\n\n"
+                    summary = quality_drift.get("summary", {})
+                    if summary.get("empty_value_issues"):
+                        result += f"- Empty value issues: {summary['empty_value_issues']}\n"
+                    if summary.get("format_issues"):
+                        result += f"- Format validation issues: {summary['format_issues']}\n"
+                    result += "\n"
+
+                # Root cause analysis
+                if drift_analysis["drift_detected"]:
+                    root_cause = DriftRootCauseAnalyzer.analyze_root_cause(
+                        drift_analysis, executions, workflow_data
+                    )
+                    result += f"## 🔍 Root Cause Analysis\n\n"
+                    result += f"**Likely Root Cause:** {root_cause.get('root_cause', 'unknown')}\n"
+                    result += f"**Confidence:** {root_cause.get('confidence', 0) * 100:.0f}%\n\n"
+                    if root_cause.get('evidence'):
+                        result += "**Evidence:**\n"
+                        for evidence in root_cause['evidence']:
+                            result += f"- {evidence}\n"
+                        result += "\n"
+                    if root_cause.get('recommended_action'):
+                        result += f"**Recommended Action:** {root_cause['recommended_action']}\n\n"
+
+                # Store drift analysis
+                state_manager.log_action("detect_drift", {
+                    "workflow_id": workflow_id,
+                    "drift_detected": drift_analysis["drift_detected"],
+                    "severity": drift_analysis.get("severity")
+                })
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "analyze_drift_pattern":
+                workflow_id = arguments["workflow_id"]
+                pattern_type = arguments["pattern_type"]
+
+                # Fetch execution history
+                executions = await n8n_client.get_workflow_executions(workflow_id)
+
+                if len(executions) < 10:
+                    return [TextContent(
+                        type="text",
+                        text=f"⚠️ Insufficient execution history for pattern analysis."
+                    )]
+
+                # Run drift detection to get patterns
+                drift_analysis = DriftDetector.analyze_execution_history(executions)
+
+                if not drift_analysis["drift_detected"]:
+                    return [TextContent(
+                        type="text",
+                        text="✅ No drift detected - pattern analysis not applicable."
+                    )]
+
+                # Find matching pattern
+                matching_pattern = None
+                for pattern in drift_analysis["patterns"]:
+                    if pattern["type"] == pattern_type:
+                        matching_pattern = pattern
+                        break
+
+                if not matching_pattern:
+                    return [TextContent(
+                        type="text",
+                        text=f"Pattern type '{pattern_type}' not found in this workflow's drift analysis."
+                    )]
+
+                # Deep analysis
+                pattern_analysis = DriftPatternAnalyzer.analyze_pattern(matching_pattern, executions)
+
+                result = f"# 🔬 Deep Drift Pattern Analysis\n\n"
+                result += f"**Pattern Type:** {pattern_analysis.get('pattern_type', pattern_type)}\n"
+                result += f"**Severity:** {pattern_analysis.get('severity', 'unknown')}\n\n"
+
+                if pattern_analysis.get('started_around'):
+                    result += f"**Started Around:** {pattern_analysis['started_around']}\n"
+                    result += f"**Gradual Change:** {'Yes' if pattern_analysis.get('change_was_gradual') else 'No'}\n\n"
+
+                if pattern_analysis.get('potential_causes'):
+                    result += "## Potential Causes\n\n"
+                    for cause in pattern_analysis['potential_causes']:
+                        result += f"- {cause}\n"
+                    result += "\n"
+
+                if pattern_analysis.get('recommendation'):
+                    result += f"## Recommendation\n\n{pattern_analysis['recommendation']}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_drift_fix_suggestions":
+                workflow_id = arguments["workflow_id"]
+
+                # Fetch workflow and execution history
+                workflow_data = await n8n_client.get_workflow(workflow_id)
+                executions = await n8n_client.get_workflow_executions(workflow_id)
+
+                if len(executions) < 10:
+                    return [TextContent(
+                        type="text",
+                        text="⚠️ Insufficient execution history for fix suggestions."
+                    )]
+
+                # Run drift detection
+                drift_analysis = DriftDetector.analyze_execution_history(executions)
+
+                if not drift_analysis["drift_detected"]:
+                    return [TextContent(
+                        type="text",
+                        text="✅ No drift detected - no fixes needed!"
+                    )]
+
+                # Get root cause
+                root_cause = DriftRootCauseAnalyzer.analyze_root_cause(
+                    drift_analysis, executions, workflow_data
+                )
+
+                # Get fix suggestions
+                fix_suggestions = DriftFixSuggester.suggest_fixes(
+                    root_cause, workflow_data, drift_analysis["patterns"]
+                )
+
+                # Also get specialized fixes
+                schema_drift = SchemaDriftAnalyzer.analyze_schema_drift(executions)
+                rate_limit_drift = RateLimitDriftAnalyzer.analyze_rate_limit_drift(executions, workflow_data)
+                quality_drift = DataQualityDriftAnalyzer.analyze_quality_drift(executions)
+
+                schema_fixes = SchemaDriftAnalyzer.suggest_schema_fixes(schema_drift, workflow_data)
+                rate_limit_fixes = RateLimitDriftAnalyzer.suggest_rate_limit_fixes(rate_limit_drift, workflow_data)
+                quality_fixes = DataQualityDriftAnalyzer.suggest_quality_fixes(quality_drift, workflow_data)
+
+                # Combine all fixes
+                all_fixes = (
+                    fix_suggestions.get("fixes", []) +
+                    schema_fixes +
+                    rate_limit_fixes +
+                    quality_fixes
+                )
+
+                result = f"# 🔧 Drift Fix Suggestions\n\n"
+                result += f"**Root Cause:** {fix_suggestions.get('root_cause', 'unknown')}\n"
+                result += f"**Confidence:** {fix_suggestions.get('confidence', 0) * 100:.0f}%\n\n"
+
+                if all_fixes:
+                    result += f"## Recommended Fixes ({len(all_fixes)})\n\n"
+
+                    # Group by severity
+                    critical_fixes = [f for f in all_fixes if f.get("severity") == "critical"]
+                    warning_fixes = [f for f in all_fixes if f.get("severity") == "warning"]
+                    other_fixes = [f for f in all_fixes if f.get("severity") not in ["critical", "warning"]]
+
+                    if critical_fixes:
+                        result += "### 🔴 Critical Fixes\n\n"
+                        for fix in critical_fixes:
+                            result += f"**{fix.get('type', 'fix')}**"
+                            if fix.get('node'):
+                                result += f" (Node: `{fix['node']}`)"
+                            result += f"\n{fix.get('description', '')}\n\n"
+                            result += f"💡 {fix.get('suggestion', '')}\n"
+                            result += f"Confidence: {fix.get('confidence', 0) * 100:.0f}%\n\n"
+
+                    if warning_fixes:
+                        result += "### ⚠️ Important Fixes\n\n"
+                        for fix in warning_fixes:
+                            result += f"**{fix.get('type', 'fix')}**"
+                            if fix.get('node'):
+                                result += f" (Node: `{fix['node']}`)"
+                            result += f"\n{fix.get('description', '')}\n\n"
+                            result += f"💡 {fix.get('suggestion', '')}\n\n"
+
+                    if other_fixes:
+                        result += "### ℹ️ Additional Improvements\n\n"
+                        for fix in other_fixes:
+                            result += f"**{fix.get('type', 'fix')}**: {fix.get('description', '')}\n"
+
+                    result += "\n"
+
+                # Testing recommendations
+                if fix_suggestions.get("testing_recommendations"):
+                    result += "## Testing Recommendations\n\n"
+                    for rec in fix_suggestions["testing_recommendations"]:
+                        result += f"- {rec}\n"
 
                 return [TextContent(type="text", text=result)]
 

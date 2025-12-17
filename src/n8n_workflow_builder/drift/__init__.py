@@ -7,10 +7,16 @@ from .detector import (
     DriftRootCauseAnalyzer,
     DriftFixSuggester
 )
+from .analyzers.schema import SchemaDriftAnalyzer
+from .analyzers.rate_limit import RateLimitDriftAnalyzer
+from .analyzers.quality import DataQualityDriftAnalyzer
 
 __all__ = [
     'DriftDetector',
     'DriftPatternAnalyzer',
     'DriftRootCauseAnalyzer',
-    'DriftFixSuggester'
+    'DriftFixSuggester',
+    'SchemaDriftAnalyzer',
+    'RateLimitDriftAnalyzer',
+    'DataQualityDriftAnalyzer'
 ]

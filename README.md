@@ -107,15 +107,42 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 - **LLM-Optimized Output**: Structured feedback designed for AI consumption
 
 ### 📊 Drift Detection & Degradation Analysis (NEW!)
-- **Temporal Analysis**: Compare baseline vs current execution patterns
-- **4 Drift Patterns**: Success rate drift, performance drift, new error patterns, error frequency drift
-- **Change Point Detection**: Find exactly when workflows started breaking
-- **Gradual vs Sudden**: Classify changes as gradual degradation or sudden breaks
-- **Root Cause Analysis**: Evidence-based determination of why workflows fail
+**Proactive quality monitoring that detects workflow degradation before it becomes critical**
+
+#### General Drift Detection
+- **Success Rate Drift**: Detects >15% drop in workflow success rate
+- **Performance Drift**: Identifies >50% increase in execution time
+- **New Error Patterns**: Finds new error types that didn't exist before
+- **Error Frequency Drift**: Detects 2x+ increase in existing error rates
+- **Change Point Detection**: Pinpoints exactly when drift started
+- **Gradual vs Sudden Analysis**: Classifies changes as gradual degradation or sudden breaks
+
+#### Specialized Analyzers
+- **Schema Drift**: API response structure changes (missing fields, type changes, null rate increases)
+- **Rate Limit Drift**: 429 errors, throughput degradation, quota proximity warnings
+- **Data Quality Drift**: Empty values, format violations, completeness degradation
+
+#### Intelligent Analysis
+- **Root Cause Detection**: 10+ evidence-based root causes (API rate limits, auth changes, schema changes, etc.)
 - **Confidence Scoring**: 0.0-1.0 confidence for all analysis results
-- **Actionable Fixes**: Error-type specific suggestions with concrete node changes
-- **7 Root Causes**: API rate limits, external dependency failures, data schema changes, credential expiry, resource exhaustion, logic bugs, configuration drift
-- **Testing Recommendations**: Specific testing steps before and after fixes
+- **Statistical Comparison**: Baseline (first 30%) vs Current (last 30%) period analysis
+- **Evidence Collection**: Tracks concrete metrics supporting each finding
+
+#### Actionable Fixes
+- **Node-Specific Suggestions**: Concrete fixes for each affected node
+- **Severity Grouping**: Critical, Warning, and Info fixes
+- **Copy-Paste Ready**: Implementation-ready code suggestions
+- **Testing Recommendations**: Step-by-step testing guides
+- **Confidence Scores**: Prioritize fixes by confidence level (85-95%)
+
+#### Real-World Use Cases
+✅ **API Provider Changes**: Detects when APIs change authentication, schemas, or rate limits
+✅ **Performance Degradation**: Finds external service slowdowns before SLAs breach
+✅ **Credential Expiry**: Identifies auth failures from expired tokens
+✅ **Data Quality Issues**: Tracks increasing null values or format violations
+✅ **Rate Limit Problems**: Catches approaching quota limits early
+
+**Requires**: 20+ executions for reliable drift detection
 
 ### 📖 Explainability Layer (NEW!)
 - **Comprehensive Documentation**: Automatic, audit-ready workflow documentation
