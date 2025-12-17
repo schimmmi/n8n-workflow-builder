@@ -5,6 +5,43 @@ All notable changes to the n8n Workflow Builder MCP Server will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2025-12-17
+
+### 🐛 Fixed - Template System Bugfixes
+
+**Critical fixes for template generation and details tools**
+
+#### Fixed UnboundLocalError in generate_workflow_template
+- **Issue**: Tool was throwing `UnboundLocalError: cannot access local variable 'WORKFLOW_TEMPLATES'`
+- **Root Cause**: Duplicate local import caused Python to treat WORKFLOW_TEMPLATES as local variable
+- **Fix**: Removed redundant import since WORKFLOW_TEMPLATES is already imported at module level
+- **Commit**: `bb2b6fc`
+
+#### Fixed UnboundLocalError in get_template_details
+- **Issue**: Same UnboundLocalError when retrieving template details
+- **Root Cause**: Direct access to WORKFLOW_TEMPLATES without proper fallback logic
+- **Fix**: Refactored to use template registry with backward compatibility fallback
+- **Commit**: `e85f877`
+
+#### Enhanced get_template_details Output
+- **Added**: Source, complexity, node count, purpose, external systems
+- **Added**: Quality indicators (error handling, documentation)
+- **Added**: Trust metrics (success rate, usage count)
+- **Backward Compatible**: Old templates still work via fallback
+
+### 📝 Technical Details
+- Python scope issue: Local imports later in function make variables local throughout entire scope
+- Solution: Import at module level, avoid local imports of module-level variables
+- All template tools now verified working correctly
+
+### ✅ Testing
+- ✅ `generate_workflow_template` - Works correctly
+- ✅ `get_template_details` - Works with enhanced metadata
+- ✅ Backward compatibility - Old templates still accessible
+- ✅ All other template tools - Verified safe
+
+---
+
 ## [1.18.0] - 2025-12-17
 
 ### 🎯 Added - Drift Detection System
