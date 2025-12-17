@@ -3639,32 +3639,46 @@ async def main():
     """Main entry point"""
     import sys
 
+    print("DEBUG: main() started", file=sys.stderr, flush=True)
+
     # Get configuration from environment
     api_url = os.getenv("N8N_API_URL")
     api_key = os.getenv("N8N_API_KEY")
 
+    print(f"DEBUG: Got env vars: API_URL={api_url is not None}, API_KEY={api_key is not None}", file=sys.stderr, flush=True)
+
     if not api_url or not api_key:
         logger.error("N8N_API_URL and N8N_API_KEY environment variables must be set")
+        print("ERROR: Missing env vars", file=sys.stderr, flush=True)
         sys.exit(1)
 
     logger.info(f"Starting n8n Workflow Builder MCP Server... (API: {api_url})")
+    print(f"DEBUG: Starting server initialization", file=sys.stderr, flush=True)
 
     try:
         server = create_n8n_server(api_url, api_key)
+        print("DEBUG: Server created successfully", file=sys.stderr, flush=True)
         logger.info("Server initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize server: {e}", exc_info=True)
+        print(f"ERROR: Server init failed: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
-    
+
     # Run the server
     from mcp.server.stdio import stdio_server
-    
+
+    print("DEBUG: About to start stdio_server", file=sys.stderr, flush=True)
+
     async with stdio_server() as (read_stream, write_stream):
+        print("DEBUG: stdio_server started, calling server.run()", file=sys.stderr, flush=True)
         await server.run(
             read_stream,
             write_stream,
             server.create_initialization_options()
         )
+        print("DEBUG: server.run() completed", file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":
