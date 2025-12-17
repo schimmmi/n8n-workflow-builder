@@ -346,7 +346,7 @@ Analyze patterns in execution failures.
 
 ## 📚 Template System
 
-Intelligent Template System v2.0 with AI-powered recommendations.
+**Dynamic Template System v2.1** with persistent caching, FTS5 search, and multi-source support.
 
 ### `recommend_templates` 🆕 **v1.13.0**
 Get AI-powered template recommendations based on your description.
@@ -382,18 +382,278 @@ Browse all available templates.
 
 ---
 
-### `search_templates`
-Search templates by keyword.
+### `sync_templates` 🆕 **v1.17.0**
+Sync templates from remote sources with smart 24-hour caching.
 
 **Parameters:**
-- `query` (required): Search query
+- `source` (optional): Source to sync ("all", "n8n_official", "github", "community")
+- `force` (optional): Force sync even if recently synced
 
 **Usage:**
 ```
-"Search templates for 'email automation'"
+"Sync templates from n8n official"
+"Force refresh all templates"
 ```
 
-**Returns:** Matching templates with relevance scores.
+**Returns:** Sync results with counts and errors.
+
+**Features:**
+- 24-hour smart caching (no unnecessary API calls)
+- Multi-source support (n8n official, GitHub repos, community URLs)
+- Persistent SQLite storage
+- Force refresh option
+
+---
+
+### `search_templates` 🔄 **Enhanced v1.17.0**
+Search templates with advanced filters and FTS5 full-text search.
+
+**Parameters:**
+- `query` (optional): Full-text search query
+- `category` (optional): Filter by category
+- `tags` (optional): Filter by tags (array)
+- `node_types` (optional): Filter by node types used (array)
+- `source` (optional): Filter by source
+- `limit` (optional): Max results (default: 20)
+
+**Usage:**
+```
+"Search templates for 'webhook'"
+"Find templates with tag 'automation'"
+"Show me templates using http_request node"
+```
+
+**Returns:** Matching templates with full metadata (complexity, nodes, setup time).
+
+**Features:**
+- SQLite FTS5 full-text search (ultra-fast)
+- Multi-dimensional filtering
+- Relevance ranking
+- Source attribution
+
+---
+
+### `get_template_stats` 🆕 **v1.17.0**
+Get comprehensive statistics about cached templates.
+
+**Usage:**
+```
+"Show template statistics"
+```
+
+**Returns:** Stats including:
+- Total template count
+- Templates by source
+- Top categories
+- Popular tags (15 most used)
+- Frequently used nodes (top 10)
+- Sync status for all sources
+
+---
+
+### `get_popular_templates` 🆕 **v1.17.0**
+Get most popular templates by view count from n8n community.
+
+**Parameters:**
+- `limit` (optional): Max templates (default: 10)
+
+**Usage:**
+```
+"Show me the 5 most popular templates"
+```
+
+**Returns:** Top templates sorted by popularity.
+
+---
+
+### `get_recent_templates` 🆕 **v1.17.0**
+Get most recently added templates.
+
+**Parameters:**
+- `limit` (optional): Max templates (default: 10)
+
+**Usage:**
+```
+"What are the latest templates?"
+```
+
+**Returns:** Recent templates sorted by creation date.
+
+---
+
+### `get_template_by_id` 🆕 **v1.17.0**
+Get specific template by ID with full details.
+
+**Parameters:**
+- `template_id` (required): Template identifier
+
+**Usage:**
+```
+"Get template simple_api_endpoint"
+```
+
+**Returns:** Complete template data including nodes, connections, metadata.
+
+---
+
+### `clear_template_cache` 🆕 **v1.17.0**
+Clear cached templates to force fresh sync.
+
+**Parameters:**
+- `source` (optional): Source to clear ("all", "n8n_official", "github", "community")
+
+**Usage:**
+```
+"Clear template cache"
+"Clear n8n official templates"
+```
+
+**Returns:** Confirmation of cleared cache.
+
+---
+
+### `discover_github_templates` 🆕 **v1.18.0**
+Discover n8n workflow templates in GitHub repositories.
+
+**Parameters:**
+- `query` (optional): Search query (default: "n8n workflows")
+- `limit` (optional): Max repositories to return (default: 10)
+
+**Usage:**
+```
+"Find n8n workflow repositories on GitHub"
+"Search GitHub for 'n8n automation templates'"
+```
+
+**Returns:** List of GitHub repositories containing n8n workflows with:
+- Repository name and owner
+- Star count and description
+- Topics and languages
+- Last update timestamp
+- Repository URL
+
+**Features:**
+- GitHub Search API integration
+- Filters for n8n-related content
+- Sorted by popularity (stars)
+- Respects GitHub API rate limits
+
+---
+
+### `import_github_repo` 🆕 **v1.18.0**
+Import n8n workflow templates from a specific GitHub repository.
+
+**Parameters:**
+- `repo_full_name` (required): Repository in format "owner/repo"
+- `add_to_sync` (optional): Add to regular sync list (default: true)
+
+**Usage:**
+```
+"Import templates from n8n-io/n8n-docs"
+"Import workflows from awesome-user/n8n-workflows without adding to sync"
+```
+
+**Returns:** Import results with:
+- Number of templates imported
+- Template details (name, category, complexity, nodes)
+- Sync list status
+- Error messages if any
+
+**Features:**
+- Searches common workflow paths (.n8n/workflows/, workflows/, etc.)
+- Validates n8n workflow structure
+- Extracts metadata (category, complexity, trigger type)
+- Caches templates locally
+- Optional auto-sync for regular updates
+
+**Workflow Paths Searched:**
+1. `.n8n/workflows/`
+2. `workflows/`
+3. `n8n-workflows/`
+4. `n8n/workflows/`
+5. Root directory (`*.json`)
+
+---
+
+### `search_templates_by_intent` 🆕 **v1.18.0**
+Search templates using intent-based semantic matching (AI-powered).
+
+**Parameters:**
+- `query` (required): Natural language description of what you want to build
+- `min_score` (optional): Minimum match score 0.0-1.0 (default: 0.3)
+- `limit` (optional): Max results (default: 20)
+
+**Usage:**
+```
+"I need to automatically respond to customer emails with AI"
+"Find templates for sending Slack notifications when GitHub issues are created"
+"Show me workflows that process data from APIs and store in databases"
+```
+
+**Returns:** Ranked templates with:
+- Match percentage (0-100%)
+- Template details
+- Why it matched your query
+
+**How It Works:**
+Intent extraction analyzes your query for:
+- **Goal** (what you want to achieve)
+- **Trigger type** (webhook, schedule, manual, event)
+- **Actions** (send, store, fetch, transform, analyze)
+- **Required/preferred nodes** (Slack, OpenAI, PostgreSQL, etc.)
+- **Domain** (communication, data pipeline, AI, etc.)
+- **Complexity** preference
+
+Scoring algorithm (multi-dimensional):
+- Goal similarity: 30%
+- Node overlap: 25%
+- Trigger match: 15%
+- Action match: 15%
+- Domain match: 10%
+- Complexity match: 5%
+
+**Advantages over keyword search:**
+- Understands **intent**, not just keywords
+- Finds semantically similar templates
+- Example: "notify team" matches Slack, Discord, Telegram templates
+- Penalizes mismatched triggers (webhook vs. schedule)
+
+---
+
+### `explain_template_match` 🆕 **v1.18.0**
+Explain why a template matched your query (transparency & debugging).
+
+**Parameters:**
+- `query` (required): Your original search query
+- `template_id` (required): Template ID to explain
+
+**Usage:**
+```
+"Explain why template abc123 matched my query"
+"Why did you recommend this template?"
+```
+
+**Returns:** Detailed explanation with:
+- **Total match score** (0-100%)
+- **Score breakdown** by component:
+  - Goal similarity score
+  - Node overlap score
+  - Trigger match score
+  - Action match score
+  - Domain match score
+  - Complexity match score
+- **Extracted intent** from your query:
+  - Detected goal
+  - Trigger type preference
+  - Required/preferred nodes
+  - Action types
+  - Domain
+
+**Use Cases:**
+- Understand recommendation logic
+- Debug unexpected results
+- Learn how intent matching works
+- Fine-tune your queries
 
 ---
 

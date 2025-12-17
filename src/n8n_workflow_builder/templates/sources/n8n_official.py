@@ -3,24 +3,41 @@ import httpx
 from typing import List, Dict, Optional
 from datetime import datetime
 from .base import TemplateSource, TemplateMetadata
+from ..cache import TemplateCache
 
 
 class N8nOfficialSource(TemplateSource):
     """Fetch templates from official n8n template repository"""
 
-    def __init__(self):
+    def __init__(self, cache_path: Optional[str] = None):
         super().__init__("n8n_official")
         self.base_url = "https://api.n8n.io/api/templates"
-        self.cache: Dict[str, TemplateMetadata] = {}
+        self.cache: Dict[str, TemplateMetadata] = {}  # In-memory cache for current session
+        self.persistent_cache = TemplateCache(cache_path)  # SQLite persistent cache
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def fetch_templates(self) -> List[TemplateMetadata]:
-        """Fetch all official n8n templates"""
+        """Fetch all official n8n templates (with smart caching)"""
         all_templates = []
 
+        # Check if we need to sync (24-hour interval)
+        should_sync = self.persistent_cache.should_sync(self.source_name, interval_hours=24)
+
+        if not should_sync:
+            # Return cached templates
+            cached = self.persistent_cache.search(source=self.source_name, limit=10000)
+            if cached:
+                # Convert cached dicts back to TemplateMetadata objects
+                return [self._dict_to_metadata(t) for t in cached]
+
+        # Sync needed: fetch from API and hardcoded sources
         # ALWAYS include hardcoded templates first (high quality, curated)
         hardcoded = self._get_hardcoded_templates()
         all_templates.extend(hardcoded)
+
+        # Cache hardcoded templates
+        for template in hardcoded:
+            self._cache_template(template)
 
         # Try to fetch additional templates from API
         try:
@@ -33,21 +50,44 @@ class N8nOfficialSource(TemplateSource):
                     if template.id not in self.cache:
                         self.cache[template.id] = template
                         all_templates.append(template)
-        except Exception:
-            pass  # Ignore API errors, we have hardcoded templates
+                        # Cache in persistent storage
+                        self._cache_template(template)
+
+                # Update sync status
+                self.persistent_cache.update_sync_status(
+                    self.source_name,
+                    template_count=len(all_templates),
+                    success=True
+                )
+        except Exception as e:
+            # Update sync status with error
+            self.persistent_cache.update_sync_status(
+                self.source_name,
+                template_count=len(all_templates),
+                success=False,
+                error=str(e)
+            )
 
         return all_templates
 
     async def get_template(self, template_id: str) -> Optional[TemplateMetadata]:
         """Get specific template"""
+        # Check in-memory cache first
         if template_id in self.cache:
             return self.cache[template_id]
 
+        # Check persistent cache
+        cached = self.persistent_cache.get_template(template_id)
+        if cached:
+            return self._dict_to_metadata(cached)
+
+        # Fetch from API
         try:
             response = await self.client.get(f"{self.base_url}/{template_id}")
             if response.status_code == 200:
                 template = self.normalize_template(response.json())
                 self.cache[template_id] = template
+                self._cache_template(template)
                 return template
         except Exception:
             pass
@@ -55,7 +95,14 @@ class N8nOfficialSource(TemplateSource):
         return None
 
     async def search_templates(self, query: str) -> List[TemplateMetadata]:
-        """Search templates"""
+        """Search templates using FTS5 full-text search"""
+        # Use persistent cache for search (much faster with FTS5)
+        cached_results = self.persistent_cache.search(query=query, source=self.source_name, limit=50)
+
+        if cached_results:
+            return [self._dict_to_metadata(t) for t in cached_results]
+
+        # Fallback: in-memory search if cache empty
         query_lower = query.lower()
         all_templates = await self.fetch_templates()
 
@@ -191,3 +238,56 @@ class N8nOfficialSource(TemplateSource):
             self.cache[template.id] = template
 
         return templates
+
+    def _cache_template(self, template: TemplateMetadata):
+        """Cache template in persistent storage"""
+        # Convert TemplateMetadata to dict format for cache
+        template_dict = {
+            "id": template.id,
+            "source": template.source,
+            "name": template.name,
+            "description": template.description,
+            "category": template.category,
+            "tags": template.tags,
+            "nodes": template.nodes,
+            "author": template.author if isinstance(template.author, str) else {"name": template.author},
+            "source_url": template.source_url,
+            "totalViews": getattr(template, "total_views", 0),
+            "createdAt": template.created_at.isoformat() if template.created_at else None,
+            "metadata": {
+                "complexity": template.complexity,
+                "node_count": template.node_count,
+                "estimated_setup_time": template.estimated_setup_time,
+                "trigger_type": template.trigger_type,
+                "has_error_handling": template.has_error_handling,
+                "has_documentation": template.has_documentation,
+                "uses_credentials": template.uses_credentials,
+            }
+        }
+        self.persistent_cache.add_template(template_dict)
+
+    def _dict_to_metadata(self, data: Dict) -> TemplateMetadata:
+        """Convert cached dict back to TemplateMetadata"""
+        metadata = data.get("metadata", {})
+        return TemplateMetadata(
+            id=data.get("id", "unknown"),
+            source=data.get("source", self.source_name),
+            name=data.get("name", "Unknown"),
+            description=data.get("description", ""),
+            category=data.get("category", "other"),
+            tags=data.get("tags", []),
+            n8n_version=">=1.0",
+            template_version="1.0.0",
+            nodes=data.get("nodes", []),
+            connections=data.get("connections", {}),
+            settings=data.get("settings", {}),
+            complexity=metadata.get("complexity", "intermediate"),
+            node_count=metadata.get("node_count", 0),
+            estimated_setup_time=metadata.get("estimated_setup_time", "Unknown"),
+            trigger_type=metadata.get("trigger_type"),
+            author=data.get("author", "Unknown"),
+            source_url=data.get("source_url", ""),
+            has_error_handling=metadata.get("has_error_handling", False),
+            has_documentation=metadata.get("has_documentation", False),
+            uses_credentials=metadata.get("uses_credentials", False)
+        )

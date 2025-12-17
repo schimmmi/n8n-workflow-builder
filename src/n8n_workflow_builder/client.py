@@ -72,39 +72,133 @@ class N8nClient:
     async def execute_workflow(self, workflow_id: str, data: Optional[Dict] = None) -> Dict:
         """Execute a workflow (test run)
 
-        Note: This triggers a workflow execution similar to the "Execute Workflow" button in the UI.
-        For production workflows, they should be triggered via webhooks or schedule.
+        Note: This method attempts multiple strategies to execute a workflow:
+        1. Check if workflow exists and get its structure
+        2. Activate the workflow if it's inactive
+        3. Try to trigger via production endpoint (webhook/manual trigger)
+        4. Fall back to helpful error message if execution is not possible via API
         """
-        # n8n API endpoint for running/testing workflows
-        # The correct endpoint might be /run or /test depending on n8n version
         try:
-            # Try the /run endpoint first (newer n8n versions)
-            response = await self.client.post(
-                f"{self.api_url}/api/v1/workflows/{workflow_id}/run",
-                headers=self.headers,
-                json=data or {}
-            )
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                # Try alternative endpoint /test (older versions)
+            # First, verify the workflow exists
+            workflow = await self.get_workflow(workflow_id)
+
+            # Check if workflow is active, activate if needed
+            if not workflow.get("active", False):
+                logger.info(f"Workflow {workflow_id} is inactive. Activating...")
+                await self.update_workflow(workflow_id, {"active": True})
+
+            # Strategy 1: Try POST to /run endpoint (some n8n versions)
+            try:
+                response = await self.client.post(
+                    f"{self.api_url}/api/v1/workflows/{workflow_id}/run",
+                    headers=self.headers,
+                    json=data or {}
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 404:
+                    raise
+
+            # Strategy 2: Try POST to /test endpoint (older versions)
+            try:
+                response = await self.client.post(
+                    f"{self.api_url}/api/v1/workflows/{workflow_id}/test",
+                    headers=self.headers,
+                    json=data or {}
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 404:
+                    raise
+
+            # Strategy 3: Check if workflow has a webhook trigger and provide URL
+            webhook_url = self._find_webhook_url(workflow)
+            if webhook_url:
+                return {
+                    "success": False,
+                    "message": f"This workflow uses a webhook trigger. Trigger it by making a POST request to: {webhook_url}",
+                    "webhook_url": webhook_url,
+                    "workflow_id": workflow_id,
+                    "workflow_name": workflow.get("name", "Unknown")
+                }
+
+            # Strategy 4: Check for manual trigger node
+            has_manual_trigger = self._has_manual_trigger(workflow)
+            if has_manual_trigger:
+                # For manual trigger workflows, we need to use the executions endpoint
                 try:
                     response = await self.client.post(
-                        f"{self.api_url}/api/v1/workflows/{workflow_id}/test",
+                        f"{self.api_url}/api/v1/executions",
                         headers=self.headers,
-                        json=data or {}
+                        json={
+                            "workflowId": workflow_id,
+                            "data": data or {}
+                        }
                     )
                     response.raise_for_status()
                     return response.json()
                 except httpx.HTTPStatusError:
-                    # If both fail, provide helpful error message
-                    raise Exception(
-                        f"Cannot execute workflow via API. "
-                        f"This workflow might need to be triggered via webhook or schedule, "
-                        f"or use the 'Execute Workflow' button in the n8n UI."
-                    )
-            raise
+                    pass
+
+            # If all strategies fail, provide helpful error
+            trigger_info = self._get_trigger_info(workflow)
+            raise Exception(
+                f"Cannot execute workflow '{workflow.get('name', workflow_id)}' via API. "
+                f"Trigger type: {trigger_info}. "
+                f"This workflow needs to be triggered via its configured trigger (webhook, schedule, etc.) "
+                f"or manually executed using the n8n UI 'Execute Workflow' button."
+            )
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Workflow {workflow_id} not found. Please verify the workflow ID.")
+            raise Exception(f"HTTP error executing workflow: {e.response.status_code} - {e.response.text}")
+        except Exception as e:
+            if "Cannot execute workflow" in str(e):
+                raise
+            logger.error(f"Error executing workflow {workflow_id}: {e}")
+            raise Exception(f"Failed to execute workflow: {str(e)}")
+
+    def _find_webhook_url(self, workflow: Dict) -> Optional[str]:
+        """Find webhook URL if workflow has webhook trigger"""
+        nodes = workflow.get("nodes", [])
+        for node in nodes:
+            node_type = node.get("type", "")
+            if "webhook" in node_type.lower():
+                # Extract webhook path
+                webhook_path = node.get("parameters", {}).get("path", "")
+                if webhook_path:
+                    # Check if it's a production or test webhook
+                    webhook_type = node.get("webhookId", "test")
+                    base_path = "webhook" if "prod" in webhook_type else "webhook-test"
+                    return f"{self.api_url}/{base_path}/{webhook_path}"
+        return None
+
+    def _has_manual_trigger(self, workflow: Dict) -> bool:
+        """Check if workflow has manual trigger node"""
+        nodes = workflow.get("nodes", [])
+        for node in nodes:
+            node_type = node.get("type", "").lower()
+            if "manualtrigger" in node_type or node_type == "n8n-nodes-base.manualtrigger":
+                return True
+        return False
+
+    def _get_trigger_info(self, workflow: Dict) -> str:
+        """Get human-readable trigger type info"""
+        nodes = workflow.get("nodes", [])
+        triggers = []
+        for node in nodes:
+            node_type = node.get("type", "")
+            if "trigger" in node_type.lower():
+                # Extract readable name
+                trigger_name = node_type.split(".")[-1] if "." in node_type else node_type
+                triggers.append(trigger_name)
+
+        if triggers:
+            return ", ".join(triggers)
+        return "Unknown"
     
     async def get_executions(self, workflow_id: Optional[str] = None, limit: int = 10) -> List[Dict]:
         """Get workflow executions (summary only, without full node data)"""

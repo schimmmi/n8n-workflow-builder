@@ -56,6 +56,7 @@ from .templates import (
     TemplateAdapter,
     ProvenanceTracker
 )
+from .templates.tools import TemplateManager
 from .migration import (
     NodeVersionChecker,
     MigrationEngine,
@@ -77,6 +78,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     workflow_builder = WorkflowBuilder()
     workflow_validator = WorkflowValidator()
     semantic_analyzer = SemanticWorkflowAnalyzer()
+    template_manager = TemplateManager()
     ai_feedback_analyzer = AIFeedbackAnalyzer()
     state_manager = StateManager()
     rbac_manager = RBACManager()
@@ -1206,6 +1208,259 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["node_type"]
+                }
+            ),
+            # Template Management Tools
+            Tool(
+                name="sync_templates",
+                description=(
+                    "🔄 Sync templates from remote sources. "
+                    "Downloads and caches templates from n8n official, GitHub, or community sources. "
+                    "Uses smart 24-hour caching to minimize API calls. Use force=true to force refresh."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "source": {
+                            "type": "string",
+                            "enum": ["all", "n8n_official", "github", "community"],
+                            "description": "Source to sync from",
+                            "default": "all"
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "description": "Force sync even if recently synced (ignores 24h cache)",
+                            "default": False
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="search_templates",
+                description=(
+                    "🔍 Search workflow templates with advanced filters. "
+                    "Full-text search using SQLite FTS5 for fast results. "
+                    "Filter by query text, category, tags, node types, or source. "
+                    "Returns template metadata including complexity, nodes used, and setup time."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Full-text search query (searches name, description, tags)"
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Filter by category (e.g., 'api', 'data_pipeline', 'communication')"
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Filter by tags (matches templates with any of these tags)"
+                        },
+                        "node_types": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Filter by node types used (e.g., ['webhook', 'http_request'])"
+                        },
+                        "source": {
+                            "type": "string",
+                            "enum": ["n8n_official", "github", "community"],
+                            "description": "Filter by template source"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results to return",
+                            "default": 20
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="get_template_stats",
+                description=(
+                    "📊 Get statistics about cached templates. "
+                    "Shows total count, templates by source, top categories, popular tags, "
+                    "frequently used nodes, and sync status for all sources."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="get_popular_templates",
+                description=(
+                    "⭐ Get most popular templates by view count. "
+                    "Returns templates sorted by popularity from the n8n community."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max templates to return",
+                            "default": 10
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="get_recent_templates",
+                description=(
+                    "🆕 Get most recently added templates. "
+                    "Returns latest templates sorted by creation date."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max templates to return",
+                            "default": 10
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="get_template_by_id",
+                description=(
+                    "📄 Get specific template by ID. "
+                    "Returns full template data including nodes, connections, and metadata."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "template_id": {
+                            "type": "string",
+                            "description": "Template identifier"
+                        }
+                    },
+                    "required": ["template_id"]
+                }
+            ),
+            Tool(
+                name="clear_template_cache",
+                description=(
+                    "🗑️ Clear template cache. "
+                    "Removes cached templates for a specific source or all sources. "
+                    "Use this if you want to force a fresh sync."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "source": {
+                            "type": "string",
+                            "enum": ["all", "n8n_official", "github", "community"],
+                            "description": "Source to clear, or 'all' for everything",
+                            "default": "all"
+                        }
+                    }
+                }
+            ),
+            # GitHub Integration Tools
+            Tool(
+                name="discover_github_templates",
+                description=(
+                    "🐙 Discover n8n workflow templates in GitHub repositories. "
+                    "Searches GitHub for repositories containing n8n workflows using GitHub Search API. "
+                    "Returns repository metadata including stars, description, topics, and last update. "
+                    "Use this to find community-created workflow templates before importing them."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query (e.g., 'n8n automation', 'n8n workflows')",
+                            "default": "n8n workflows"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max repositories to return",
+                            "default": 10
+                        }
+                    }
+                }
+            ),
+            Tool(
+                name="import_github_repo",
+                description=(
+                    "📦 Import n8n workflow templates from a GitHub repository. "
+                    "Fetches all n8n workflow JSON files from the specified repository. "
+                    "Searches common paths like '.n8n/workflows/', 'workflows/', etc. "
+                    "Validates workflows, extracts metadata, and caches them locally. "
+                    "Optionally adds the repo to the sync list for regular updates."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_full_name": {
+                            "type": "string",
+                            "description": "Repository in format 'owner/repo' (e.g., 'n8n-io/n8n-docs')"
+                        },
+                        "add_to_sync": {
+                            "type": "boolean",
+                            "description": "Add repository to regular sync list",
+                            "default": True
+                        }
+                    },
+                    "required": ["repo_full_name"]
+                }
+            ),
+            # Intent-Based Search Tools
+            Tool(
+                name="search_templates_by_intent",
+                description=(
+                    "🎯 Search templates using intent-based semantic matching. "
+                    "Goes beyond keyword search to understand what you're trying to build. "
+                    "Extracts intent (goal, triggers, actions, nodes needed) from your natural language query. "
+                    "Scores templates using multi-dimensional similarity: goal (30%), nodes (25%), triggers (15%), actions (15%), domain (10%), complexity (5%). "
+                    "Returns ranked results with match percentage and explanation."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Natural language description of what you want to build (e.g., 'I need to automatically respond to customer emails with AI')"
+                        },
+                        "min_score": {
+                            "type": "number",
+                            "description": "Minimum match score (0.0-1.0)",
+                            "default": 0.3
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results to return",
+                            "default": 20
+                        }
+                    },
+                    "required": ["query"]
+                }
+            ),
+            Tool(
+                name="explain_template_match",
+                description=(
+                    "📊 Explain why a template matches your query. "
+                    "Provides detailed breakdown of intent similarity scoring. "
+                    "Shows scores for goal similarity, node overlap, trigger match, action match, domain match, and complexity match. "
+                    "Helps understand why certain templates were recommended."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Your original search query"
+                        },
+                        "template_id": {
+                            "type": "string",
+                            "description": "Template ID to explain"
+                        }
+                    },
+                    "required": ["query", "template_id"]
                 }
             )
         ]
@@ -3830,6 +4085,341 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += f"- **Severity:** {rule.severity}\n"
                     result += f"- **Description:** {rule.description}\n"
                     result += "\n"
+
+                return [TextContent(type="text", text=result)]
+
+            # Template Management Tools
+            elif name == "sync_templates":
+                source = arguments.get("source", "all")
+                force = arguments.get("force", False)
+
+                result_data = await template_manager.sync_templates(source=source, force=force)
+
+                result = "# 🔄 Template Sync Results\n\n"
+                result += f"**Sources Synced:** {', '.join(result_data['synced_sources']) or 'None'}\n"
+                result += f"**Total Templates:** {result_data['total_templates']}\n\n"
+
+                if result_data['errors']:
+                    result += "## ⚠️ Errors:\n"
+                    for error in result_data['errors']:
+                        result += f"- {error}\n"
+                else:
+                    result += "✅ Sync completed successfully!\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "search_templates":
+                query = arguments.get("query")
+                category = arguments.get("category")
+                tags = arguments.get("tags")
+                node_types = arguments.get("node_types")
+                source = arguments.get("source")
+                limit = arguments.get("limit", 20)
+
+                templates = await template_manager.search_templates(
+                    query=query,
+                    category=category,
+                    tags=tags,
+                    node_types=node_types,
+                    source=source,
+                    limit=limit
+                )
+
+                if not templates:
+                    return [TextContent(type="text", text="No templates found matching your criteria.")]
+
+                result = f"# 🔍 Found {len(templates)} Template(s)\n\n"
+
+                for i, template in enumerate(templates, 1):
+                    result += f"## {i}. {template['name']}\n"
+                    result += f"**ID:** `{template['id']}`\n"
+                    result += f"**Source:** {template['source']}\n"
+                    result += f"**Category:** {template['category']}\n"
+                    result += f"**Complexity:** {template['complexity']}\n"
+                    result += f"**Nodes:** {template['node_count']} nodes\n"
+                    result += f"**Setup Time:** {template['estimated_setup_time']}\n"
+                    if template['tags']:
+                        result += f"**Tags:** {', '.join(template['tags'][:5])}\n"
+                    result += f"\n{template['description'][:200]}...\n\n"
+                    if template.get('source_url'):
+                        result += f"[View Template]({template['source_url']})\n\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_template_stats":
+                stats = template_manager.get_template_stats()
+
+                result = "# 📊 Template Statistics\n\n"
+                result += f"**Total Templates:** {stats['total_templates']}\n\n"
+
+                if stats['by_source']:
+                    result += "## Templates by Source:\n"
+                    for source, count in stats['by_source'].items():
+                        result += f"- {source}: {count}\n"
+                    result += "\n"
+
+                if stats['top_categories']:
+                    result += "## Top Categories:\n"
+                    for category, count in list(stats['top_categories'].items())[:10]:
+                        result += f"- {category}: {count}\n"
+                    result += "\n"
+
+                if stats['popular_tags']:
+                    result += "## Popular Tags:\n"
+                    tags_list = list(stats['popular_tags'].items())[:15]
+                    result += ", ".join([f"{tag} ({count})" for tag, count in tags_list])
+                    result += "\n\n"
+
+                if stats['popular_nodes']:
+                    result += "## Frequently Used Nodes:\n"
+                    for node, count in list(stats['popular_nodes'].items())[:10]:
+                        result += f"- {node}: {count}\n"
+                    result += "\n"
+
+                if stats.get('sync_status'):
+                    result += "## Sync Status:\n"
+                    for source, status in stats['sync_status'].items():
+                        if status.get('synced') is False:
+                            result += f"- {source}: Not synced yet\n"
+                        else:
+                            result += f"- {source}: Last synced {status['last_sync']}, {status['template_count']} templates\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_popular_templates":
+                limit = arguments.get("limit", 10)
+                templates = template_manager.get_popular_templates(limit=limit)
+
+                if not templates:
+                    return [TextContent(type="text", text="No popular templates found.")]
+
+                result = f"# ⭐ Top {len(templates)} Popular Templates\n\n"
+
+                for i, template in enumerate(templates, 1):
+                    views = template.get('total_views', 0)
+                    result += f"## {i}. {template['name']} ({views} views)\n"
+                    result += f"**ID:** `{template['id']}`\n"
+                    result += f"**Category:** {template['category']}\n"
+                    result += f"{template['description'][:150]}...\n\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_recent_templates":
+                limit = arguments.get("limit", 10)
+                templates = template_manager.get_recent_templates(limit=limit)
+
+                if not templates:
+                    return [TextContent(type="text", text="No recent templates found.")]
+
+                result = f"# 🆕 {len(templates)} Recent Template(s)\n\n"
+
+                for i, template in enumerate(templates, 1):
+                    result += f"## {i}. {template['name']}\n"
+                    result += f"**ID:** `{template['id']}`\n"
+                    result += f"**Category:** {template['category']}\n"
+                    result += f"{template['description'][:150]}...\n\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_template_by_id":
+                template_id = arguments["template_id"]
+                template = await template_manager.get_template_by_id(template_id)
+
+                if not template:
+                    return [TextContent(type="text", text=f"Template not found: {template_id}")]
+
+                result = f"# 📄 Template: {template['name']}\n\n"
+                result += f"**ID:** `{template['id']}`\n"
+                result += f"**Source:** {template['source']}\n"
+                result += f"**Category:** {template.get('category', 'unknown')}\n"
+                result += f"**Complexity:** {template.get('complexity', 'intermediate')}\n"
+                result += f"**Node Count:** {template.get('node_count', 0)}\n"
+                result += f"**Setup Time:** {template.get('estimated_setup_time', 'Unknown')}\n"
+                result += f"**Trigger Type:** {template.get('trigger_type', 'N/A')}\n"
+                result += f"**Author:** {template.get('author', 'Unknown')}\n\n"
+
+                if template.get('tags'):
+                    result += f"**Tags:** {', '.join(template['tags'])}\n\n"
+
+                result += f"## Description\n{template['description']}\n\n"
+
+                if template.get('nodes'):
+                    result += f"## Nodes ({len(template['nodes'])})\n"
+                    for node in template['nodes'][:10]:
+                        node_name = node.get('name', 'Unknown')
+                        node_type = node.get('type', 'Unknown')
+                        result += f"- {node_name} ({node_type})\n"
+                    if len(template['nodes']) > 10:
+                        result += f"... and {len(template['nodes']) - 10} more\n"
+                    result += "\n"
+
+                if template.get('has_error_handling'):
+                    result += "✅ Includes error handling\n"
+                if template.get('has_documentation'):
+                    result += "✅ Well documented\n"
+
+                if template.get('source_url'):
+                    result += f"\n[View Original]({template['source_url']})\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "clear_template_cache":
+                source = arguments.get("source", "all")
+                result_data = template_manager.clear_cache(source=source)
+
+                result = f"# 🗑️ Template Cache Cleared\n\n"
+                result += f"**Cleared:** {result_data['cleared']}\n\n"
+                result += "✅ Cache has been cleared. Use `sync_templates` to re-download.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            # GitHub Integration Tools
+            elif name == "discover_github_templates":
+                query = arguments.get("query", "n8n workflows")
+                limit = arguments.get("limit", 10)
+
+                repos = await template_manager.discover_github_templates(query=query, limit=limit)
+
+                result = f"# 🐙 GitHub Repository Discovery\n\n"
+                result += f"**Search Query:** {query}\n"
+                result += f"**Repositories Found:** {len(repos)}\n\n"
+
+                if repos:
+                    for i, repo in enumerate(repos, 1):
+                        result += f"## {i}. {repo['full_name']}\n"
+                        result += f"⭐ **Stars:** {repo['stars']}\n"
+                        if repo.get('description'):
+                            result += f"📝 **Description:** {repo['description']}\n"
+                        result += f"🔗 **URL:** {repo['url']}\n"
+                        if repo.get('topics'):
+                            result += f"🏷️  **Topics:** {', '.join(repo['topics'][:5])}\n"
+                        if repo.get('language'):
+                            result += f"💻 **Language:** {repo['language']}\n"
+                        result += f"🕐 **Last Updated:** {repo.get('updated_at', 'Unknown')}\n"
+                        result += "\n"
+                else:
+                    result += "⚠️ No repositories found.\n"
+                    result += "This might be due to GitHub API rate limiting.\n"
+                    result += "Consider setting GITHUB_TOKEN environment variable.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "import_github_repo":
+                repo_full_name = arguments["repo_full_name"]
+                add_to_sync = arguments.get("add_to_sync", True)
+
+                result_data = await template_manager.import_github_repo(
+                    repo_full_name=repo_full_name,
+                    add_to_sync=add_to_sync
+                )
+
+                result = f"# 📦 GitHub Repository Import\n\n"
+                result += f"**Repository:** {repo_full_name}\n"
+
+                if result_data.get('success'):
+                    result += f"**Status:** ✅ Success\n"
+                    result += f"**Templates Imported:** {result_data['templates_imported']}\n"
+                    result += f"**Added to Sync List:** {'Yes' if add_to_sync else 'No'}\n\n"
+
+                    if result_data['templates_imported'] > 0:
+                        result += "## Imported Templates:\n\n"
+                        for template in result_data.get('templates', [])[:10]:
+                            result += f"### {template['name']}\n"
+                            result += f"- **ID:** `{template['id']}`\n"
+                            result += f"- **Category:** {template.get('category', 'unknown')}\n"
+                            result += f"- **Nodes:** {template.get('node_count', 0)}\n"
+                            result += f"- **Complexity:** {template.get('complexity', 'unknown')}\n"
+                            if template.get('source_url'):
+                                result += f"- **Source:** {template['source_url']}\n"
+                            result += "\n"
+
+                        if result_data['templates_imported'] > 10:
+                            result += f"... and {result_data['templates_imported'] - 10} more templates\n"
+                    else:
+                        result += "ℹ️ No workflow files found in this repository.\n"
+                        result += "The repository might not contain n8n workflows in standard paths.\n"
+                else:
+                    result += f"**Status:** ❌ Failed\n"
+                    result += f"**Error:** {result_data.get('error', 'Unknown error')}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            # Intent-Based Search Tools
+            elif name == "search_templates_by_intent":
+                query = arguments["query"]
+                min_score = arguments.get("min_score", 0.3)
+                limit = arguments.get("limit", 20)
+
+                results = await template_manager.search_templates_by_intent(
+                    query=query,
+                    min_score=min_score,
+                    limit=limit
+                )
+
+                result = f"# 🎯 Intent-Based Template Search\n\n"
+                result += f"**Query:** {query}\n"
+                result += f"**Min Score:** {min_score * 100}%\n"
+                result += f"**Results Found:** {len(results)}\n\n"
+
+                if results:
+                    for i, template in enumerate(results, 1):
+                        result += f"## {i}. {template['name']} ({template['match_percentage']})\n"
+                        result += f"**ID:** `{template['id']}`\n"
+                        result += f"**Source:** {template['source']}\n"
+                        result += f"**Category:** {template.get('category', 'unknown')}\n"
+                        if template.get('description'):
+                            desc = template['description'][:150]
+                            result += f"**Description:** {desc}{'...' if len(template['description']) > 150 else ''}\n"
+                        result += f"**Nodes:** {template.get('node_count', 0)}\n"
+                        result += f"**Complexity:** {template.get('complexity', 'unknown')}\n"
+                        if template.get('tags'):
+                            result += f"**Tags:** {', '.join(template['tags'][:5])}\n"
+                        result += "\n"
+                else:
+                    result += "No templates found matching this query.\n"
+                    result += "Try:\n"
+                    result += "- Lowering the min_score\n"
+                    result += "- Using more general terms\n"
+                    result += "- Syncing more template sources\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "explain_template_match":
+                query = arguments["query"]
+                template_id = arguments["template_id"]
+
+                explanation = template_manager.explain_template_match(query, template_id)
+
+                if explanation.get('error'):
+                    return [TextContent(type="text", text=f"❌ {explanation['error']}")]
+
+                result = f"# 📊 Template Match Explanation\n\n"
+                result += f"**Query:** {query}\n"
+                result += f"**Template:** {explanation['template_name']}\n"
+                result += f"**Total Score:** {explanation['total_score']:.2%}\n\n"
+
+                result += "## Score Breakdown:\n\n"
+                breakdown = explanation.get('breakdown', {})
+                result += f"- **Goal Similarity:** {breakdown.get('goal_similarity', 0):.2%} (weight: 30%)\n"
+                result += f"- **Node Overlap:** {breakdown.get('node_overlap', 0):.2%} (weight: 25%)\n"
+                result += f"- **Trigger Match:** {breakdown.get('trigger_match', 0):.2%} (weight: 15%)\n"
+                result += f"- **Action Match:** {breakdown.get('action_match', 0):.2%} (weight: 15%)\n"
+                result += f"- **Domain Match:** {breakdown.get('domain_match', 0):.2%} (weight: 10%)\n"
+                result += f"- **Complexity Match:** {breakdown.get('complexity_match', 0):.2%} (weight: 5%)\n\n"
+
+                result += "## Extracted Intent:\n\n"
+                intent = explanation.get('intent', {})
+                result += f"- **Goal:** {intent.get('goal', 'unknown')}\n"
+                if intent.get('trigger_type'):
+                    result += f"- **Trigger Type:** {intent['trigger_type']}\n"
+                if intent.get('required_nodes'):
+                    result += f"- **Required Nodes:** {', '.join(intent['required_nodes'])}\n"
+                if intent.get('preferred_nodes'):
+                    result += f"- **Preferred Nodes:** {', '.join(intent['preferred_nodes'])}\n"
+                if intent.get('action_types'):
+                    result += f"- **Action Types:** {', '.join(intent['action_types'])}\n"
+                if intent.get('domain'):
+                    result += f"- **Domain:** {intent['domain']}\n"
 
                 return [TextContent(type="text", text=result)]
 

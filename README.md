@@ -1380,6 +1380,22 @@ For detailed information about the template system, see:
 
 ## 📦 Recent Updates
 
+### v1.16.1 - Critical FTS5 Bug Fix (2025-12-17)
+- **[Release Notes](releases/v1.16.1.md)**
+- 🐛 **CRITICAL FIX**: Fixed FTS5 duplicate entries bug that prevented GitHub templates from appearing in searches
+- FTS5 virtual tables don't handle `INSERT OR REPLACE` correctly - now using explicit DELETE before INSERT
+- GitHub templates now properly indexed and searchable
+- Added comprehensive logging for debugging template caching
+- All full-text search and category filters now work correctly
+
+### v1.16.0 - Dynamic Template Library (2025-12-17)
+- **[Release Notes](releases/v1.16.0.md)**
+- Added Intent-Based Matching Engine for semantic template search
+- Added GitHub Adapter for importing templates from GitHub repositories
+- Discover and import n8n workflows from public GitHub repos
+- 4 new MCP tools: `discover_github_templates`, `import_github_repo`, `search_templates_by_intent`, `explain_template_match`
+- Enhanced template metadata with complexity, node count, trigger types
+
 ### v1.15.0 - Migration Engine (2025-12-17)
 - **[Release Notes](releases/v1.15.0.md)**
 - Added Migration Engine with 5 core components
