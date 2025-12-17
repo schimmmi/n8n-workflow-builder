@@ -1639,6 +1639,56 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     },
                     "required": ["workflow_id"]
                 }
+            ),
+            Tool(
+                name="get_node_types",
+                description=(
+                    "📦 Get list of all available n8n node types. "
+                    "Returns node names, display names, descriptions, and versions. "
+                    "Use this to discover what nodes are available in your n8n instance."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            Tool(
+                name="get_node_type_schema",
+                description=(
+                    "🔍 Get detailed schema for a specific node type. "
+                    "Returns all available operations, parameters, credentials, and options. "
+                    "Essential for understanding what a node can do and how to configure it. "
+                    "Includes: operations list, parameter definitions, credential requirements, "
+                    "dynamic options, input/output schemas."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "node_type": {
+                            "type": "string",
+                            "description": "Node type name (e.g., 'n8n-nodes-base.googleDrive', 'n8n-nodes-base.slack')"
+                        }
+                    },
+                    "required": ["node_type"]
+                }
+            ),
+            Tool(
+                name="search_node_types",
+                description=(
+                    "🔎 Search for node types by keyword. "
+                    "Find nodes related to specific services or functionality. "
+                    "Searches in node names, display names, and descriptions."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query (e.g., 'google', 'database', 'slack')"
+                        }
+                    },
+                    "required": ["query"]
+                }
             )
         ]
 
@@ -5184,6 +5234,190 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                     result += "## Testing Recommendations\n\n"
                     for rec in fix_suggestions["testing_recommendations"]:
                         result += f"- {rec}\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_node_types":
+                # Get all available node types
+                node_types = await n8n_client.get_node_types()
+
+                result = f"# 📦 Available Node Types ({len(node_types)})\n\n"
+
+                # Group by category (extract from node type name)
+                categorized = {}
+                for node in node_types:
+                    node_name = node.get('name', '')
+                    display_name = node.get('displayName', node_name)
+                    description = node.get('description', '')
+
+                    # Extract category from node name (e.g., n8n-nodes-base.googleDrive → base)
+                    if '.' in node_name:
+                        parts = node_name.split('.')
+                        category = parts[0] if len(parts) > 0 else 'other'
+                    else:
+                        category = 'other'
+
+                    if category not in categorized:
+                        categorized[category] = []
+
+                    categorized[category].append({
+                        'name': node_name,
+                        'displayName': display_name,
+                        'description': description
+                    })
+
+                # Sort categories
+                for category in sorted(categorized.keys()):
+                    nodes = categorized[category]
+                    result += f"## {category.replace('n8n-nodes-', '').title()} Nodes ({len(nodes)})\n\n"
+
+                    # Sort nodes by display name
+                    for node in sorted(nodes, key=lambda x: x['displayName']):
+                        result += f"### {node['displayName']}\n"
+                        result += f"- **Type:** `{node['name']}`\n"
+                        if node['description']:
+                            result += f"- **Description:** {node['description'][:100]}"
+                            if len(node['description']) > 100:
+                                result += "..."
+                            result += "\n"
+                        result += "\n"
+
+                result += f"\n💡 **Tip:** Use `get_node_type_schema(node_type)` to see detailed schema for any node.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_node_type_schema":
+                node_type = arguments["node_type"]
+
+                # Get node schema
+                schema = await n8n_client.get_node_type_schema(node_type)
+
+                result = f"# 🔍 Node Type Schema: {schema.get('displayName', node_type)}\n\n"
+                result += f"**Type:** `{node_type}`\n"
+                result += f"**Version:** {schema.get('version', 'N/A')}\n\n"
+
+                if schema.get('description'):
+                    result += f"## Description\n\n{schema['description']}\n\n"
+
+                # Operations (for nodes with operations)
+                if 'properties' in schema:
+                    properties = schema['properties']
+
+                    # Check for operations
+                    if any(prop.get('name') == 'operation' for prop in properties):
+                        operation_prop = next((p for p in properties if p.get('name') == 'operation'), None)
+                        if operation_prop and 'options' in operation_prop:
+                            result += f"## Available Operations ({len(operation_prop['options'])})\n\n"
+                            for op in operation_prop['options']:
+                                result += f"### {op.get('name', 'Unknown')}\n"
+                                result += f"- **Value:** `{op.get('value', '')}`\n"
+                                if op.get('description'):
+                                    result += f"- **Description:** {op['description']}\n"
+                                result += "\n"
+
+                    # Check for resource
+                    if any(prop.get('name') == 'resource' for prop in properties):
+                        resource_prop = next((p for p in properties if p.get('name') == 'resource'), None)
+                        if resource_prop and 'options' in resource_prop:
+                            result += f"## Available Resources ({len(resource_prop['options'])})\n\n"
+                            for res in resource_prop['options']:
+                                result += f"- **{res.get('name', 'Unknown')}** (`{res.get('value', '')}`)\n"
+                            result += "\n"
+
+                    # All parameters
+                    result += f"## Parameters ({len(properties)})\n\n"
+                    for prop in properties:
+                        prop_name = prop.get('displayName', prop.get('name', 'Unknown'))
+                        prop_type = prop.get('type', 'unknown')
+                        required = '**Required**' if prop.get('required') else 'Optional'
+
+                        result += f"### {prop_name}\n"
+                        result += f"- **Field Name:** `{prop.get('name', '')}`\n"
+                        result += f"- **Type:** `{prop_type}`\n"
+                        result += f"- **Status:** {required}\n"
+
+                        if prop.get('description'):
+                            result += f"- **Description:** {prop['description']}\n"
+
+                        if prop.get('default') is not None:
+                            result += f"- **Default:** `{prop['default']}`\n"
+
+                        # Options (for select/dropdown fields)
+                        if 'options' in prop and isinstance(prop['options'], list):
+                            result += f"- **Options:** {len(prop['options'])} available\n"
+                            if len(prop['options']) <= 10:
+                                for opt in prop['options']:
+                                    if isinstance(opt, dict):
+                                        result += f"  - `{opt.get('value', '')}`: {opt.get('name', '')}\n"
+                            else:
+                                result += f"  - (Use schema to see all {len(prop['options'])} options)\n"
+
+                        result += "\n"
+
+                # Credentials
+                if 'credentials' in schema and schema['credentials']:
+                    result += f"## Required Credentials ({len(schema['credentials'])})\n\n"
+                    for cred in schema['credentials']:
+                        result += f"- **{cred.get('displayName', 'Unknown')}**\n"
+                        result += f"  - Type: `{cred.get('name', '')}`\n"
+                        if cred.get('required'):
+                            result += "  - Required: Yes\n"
+                        result += "\n"
+
+                # Inputs/Outputs
+                if 'inputs' in schema:
+                    result += f"## Inputs\n\n"
+                    if isinstance(schema['inputs'], list):
+                        result += f"- Accepts {len(schema['inputs'])} input(s)\n"
+                    else:
+                        result += f"- {schema['inputs']}\n"
+                    result += "\n"
+
+                if 'outputs' in schema:
+                    result += f"## Outputs\n\n"
+                    if isinstance(schema['outputs'], list):
+                        result += f"- Provides {len(schema['outputs'])} output(s)\n"
+                    else:
+                        result += f"- {schema['outputs']}\n"
+                    result += "\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "search_node_types":
+                query = arguments["query"].lower()
+
+                # Get all node types
+                node_types = await n8n_client.get_node_types()
+
+                # Search in name, displayName, and description
+                matches = []
+                for node in node_types:
+                    node_name = node.get('name', '').lower()
+                    display_name = node.get('displayName', '').lower()
+                    description = node.get('description', '').lower()
+
+                    if (query in node_name or
+                        query in display_name or
+                        query in description):
+                        matches.append(node)
+
+                if not matches:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ No node types found matching '{query}'.\n\nTry:\n- Different keywords\n- Broader search terms\n- Use `get_node_types` to see all available nodes"
+                    )]
+
+                result = f"# 🔎 Search Results for '{query}' ({len(matches)} matches)\n\n"
+
+                for node in sorted(matches, key=lambda x: x.get('displayName', '')):
+                    result += f"## {node.get('displayName', 'Unknown')}\n"
+                    result += f"- **Type:** `{node.get('name', '')}`\n"
+                    result += f"- **Version:** {node.get('version', 'N/A')}\n"
+                    if node.get('description'):
+                        result += f"- **Description:** {node['description']}\n"
+                    result += "\n"
+
+                result += f"\n💡 **Tip:** Use `get_node_type_schema(node_type)` to see detailed schema for any node.\n"
 
                 return [TextContent(type="text", text=result)]
 

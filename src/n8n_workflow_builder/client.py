@@ -357,6 +357,60 @@ class N8nClient:
             logger.error(f"Failed to delete workflow {workflow_id}: {error_detail}")
             raise Exception(f"Failed to delete workflow: {error_detail}")
 
+    async def get_node_types(self) -> List[Dict]:
+        """Get list of all available node types
+
+        Returns:
+            List of node type metadata including name, displayName, description, version
+        """
+        try:
+            response = await self.client.get(
+                f"{self.api_url}/api/v1/node-types",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
+            logger.error(f"Failed to get node types: {error_detail}")
+            raise Exception(f"Failed to get node types: {error_detail}")
+
+    async def get_node_type_schema(self, node_type: str) -> Dict:
+        """Get detailed schema for a specific node type
+
+        Args:
+            node_type: Node type name (e.g., "n8n-nodes-base.googleDrive")
+
+        Returns:
+            Complete node schema including:
+            - displayName, description, version
+            - properties: all available parameters
+            - operations: available operations (for resource nodes)
+            - credentials: required credential types
+            - outputs: output schema
+        """
+        try:
+            response = await self.client.get(
+                f"{self.api_url}/api/v1/node-types/{node_type}",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise Exception(f"Node type '{node_type}' not found. Use get_node_types() to see available nodes.")
+            error_detail = ""
+            try:
+                error_detail = e.response.text
+            except:
+                error_detail = str(e)
+            logger.error(f"Failed to get node type schema for {node_type}: {error_detail}")
+            raise Exception(f"Failed to get node type schema: {error_detail}")
+
     async def close(self):
         """Close HTTP client"""
         await self.client.aclose()
