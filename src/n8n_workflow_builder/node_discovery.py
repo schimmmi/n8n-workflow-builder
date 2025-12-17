@@ -14,14 +14,29 @@ This gives us:
 from typing import Dict, List, Set, Optional
 from collections import defaultdict
 import json
+import sqlite3
+from pathlib import Path
+import os
 
 
 class NodeDiscovery:
     """Discovers node types and schemas from existing workflows"""
 
-    def __init__(self):
+    def __init__(self, db_path: Optional[str] = None):
         self.discovered_nodes = {}  # node_type -> NodeSchema
         self.node_usage_count = defaultdict(int)  # Track popularity
+
+        # Database for persistence
+        if db_path is None:
+            # Default to ~/.n8n-mcp/node_discovery.db
+            home = Path.home()
+            db_dir = home / ".n8n-mcp"
+            db_dir.mkdir(exist_ok=True)
+            db_path = str(db_dir / "node_discovery.db")
+
+        self.db_path = db_path
+        self._init_db()
+        self._load_from_db()
 
     def analyze_workflows(self, workflows: List[Dict]) -> Dict:
         """
@@ -35,6 +50,9 @@ class NodeDiscovery:
         """
         for workflow in workflows:
             self._analyze_workflow(workflow)
+
+        # Save to database after analysis
+        self._save_to_db()
 
         return self.get_summary()
 
@@ -230,6 +248,77 @@ class NodeDiscovery:
             }
 
         return export
+
+    def _init_db(self):
+        """Initialize database tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Discovered nodes table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS discovered_nodes (
+                node_type TEXT PRIMARY KEY,
+                name TEXT,
+                type_version INTEGER,
+                usage_count INTEGER DEFAULT 0,
+                parameters TEXT,
+                parameter_types TEXT,
+                credentials TEXT,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+    def _load_from_db(self):
+        """Load discovered nodes from database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM discovered_nodes')
+        rows = cursor.fetchall()
+
+        for row in rows:
+            node_type = row[0]
+            self.discovered_nodes[node_type] = {
+                'type': node_type,
+                'name': row[1],
+                'typeVersion': row[2],
+                'seen_parameters': set(json.loads(row[4])) if row[4] else set(),
+                'parameter_types': json.loads(row[5]) if row[5] else {},
+                'credentials': json.loads(row[6]) if row[6] else None,
+            }
+            self.node_usage_count[node_type] = row[3]
+
+        conn.close()
+
+    def _save_to_db(self):
+        """Save discovered nodes to database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        for node_type, schema in self.discovered_nodes.items():
+            cursor.execute('''
+                INSERT OR REPLACE INTO discovered_nodes
+                (node_type, name, type_version, usage_count, parameters, parameter_types, credentials, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (
+                node_type,
+                schema.get('name'),
+                schema.get('typeVersion', 1),
+                self.node_usage_count[node_type],
+                json.dumps(list(schema.get('seen_parameters', []))),
+                json.dumps(schema.get('parameter_types', {})),
+                json.dumps(schema.get('credentials'))
+            ))
+
+        conn.commit()
+        conn.close()
+
+    def save(self):
+        """Manually save to database"""
+        self._save_to_db()
 
 
 class NodeRecommender:

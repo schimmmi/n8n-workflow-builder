@@ -1718,7 +1718,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     @server.call_tool()
     async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         """Handle tool calls"""
-        
+        global node_recommender
+
         try:
             if name == "suggest_workflow_nodes":
                 description = arguments["description"]
@@ -5260,187 +5261,170 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 return [TextContent(type="text", text=result)]
 
-            elif name == "get_node_types":
-                # Get all available node types
-                node_types = await n8n_client.get_node_types()
+            elif name == "discover_nodes":
+                # Analyze all workflows to discover node types
+                workflows = await n8n_client.list_workflows()
 
-                result = f"# 📦 Available Node Types ({len(node_types)})\n\n"
+                # Get full workflow details for analysis
+                full_workflows = []
+                for workflow in workflows:
+                    workflow_id = workflow.get('id')
+                    if workflow_id:
+                        try:
+                            full_workflow = await n8n_client.get_workflow(workflow_id)
+                            full_workflows.append(full_workflow)
+                        except Exception as e:
+                            logger.warning(f"Could not load workflow {workflow_id}: {e}")
 
-                # Group by category (extract from node type name)
-                categorized = {}
-                for node in node_types:
-                    node_name = node.get('name', '')
-                    display_name = node.get('displayName', node_name)
-                    description = node.get('description', '')
+                # Analyze workflows and discover nodes
+                summary = node_discovery.analyze_workflows(full_workflows)
 
-                    # Extract category from node name (e.g., n8n-nodes-base.googleDrive → base)
-                    if '.' in node_name:
-                        parts = node_name.split('.')
-                        category = parts[0] if len(parts) > 0 else 'other'
-                    else:
-                        category = 'other'
+                # Initialize recommender if not already done
+                if node_recommender is None:
+                    node_recommender = NodeRecommender(node_discovery)
 
-                    if category not in categorized:
-                        categorized[category] = []
+                result = f"# 📦 Node Discovery Complete\n\n"
+                result += f"**Analyzed:** {len(full_workflows)} workflows\n"
+                result += f"**Discovered:** {summary['total_node_types']} unique node types\n"
+                result += f"**Total Usage:** {summary['total_usage']} node instances\n\n"
 
-                    categorized[category].append({
-                        'name': node_name,
-                        'displayName': display_name,
-                        'description': description
-                    })
+                result += f"## 🔥 Most Popular Nodes\n\n"
+                for node_type, count in summary['most_used'][:10]:
+                    result += f"- **{node_type}**: {count} uses\n"
 
-                # Sort categories
-                for category in sorted(categorized.keys()):
-                    nodes = categorized[category]
-                    result += f"## {category.replace('n8n-nodes-', '').title()} Nodes ({len(nodes)})\n\n"
+                result += f"\n## 📋 All Discovered Node Types\n\n"
+                for i, node_type in enumerate(sorted(summary['node_types']), 1):
+                    result += f"{i}. `{node_type}`\n"
 
-                    # Sort nodes by display name
-                    for node in sorted(nodes, key=lambda x: x['displayName']):
-                        result += f"### {node['displayName']}\n"
-                        result += f"- **Type:** `{node['name']}`\n"
-                        if node['description']:
-                            result += f"- **Description:** {node['description'][:100]}"
-                            if len(node['description']) > 100:
-                                result += "..."
-                            result += "\n"
-                        result += "\n"
-
-                result += f"\n💡 **Tip:** Use `get_node_type_schema(node_type)` to see detailed schema for any node.\n"
+                result += f"\n💡 **Next Steps:**\n"
+                result += f"- Use `get_node_schema(node_type)` to see parameters for a specific node\n"
+                result += f"- Use `search_nodes(keyword)` to find nodes by keyword\n"
+                result += f"- Use `recommend_nodes_for_task(task)` to get recommendations\n"
+                result += f"\n✅ Knowledge saved to: `{node_discovery.db_path}`\n"
 
                 return [TextContent(type="text", text=result)]
 
-            elif name == "get_node_type_schema":
+            elif name == "get_node_schema":
                 node_type = arguments["node_type"]
 
-                # Get node schema
-                schema = await n8n_client.get_node_type_schema(node_type)
+                # Get discovered schema
+                schema = node_discovery.get_node_schema(node_type)
 
-                result = f"# 🔍 Node Type Schema: {schema.get('displayName', node_type)}\n\n"
+                if not schema:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ Node type `{node_type}` not found in discovered nodes.\n\n"
+                             f"💡 Run `discover_nodes` first to analyze workflows and learn about nodes."
+                    )]
+
+                result = f"# 🔍 Node Schema: {schema.get('name', node_type)}\n\n"
                 result += f"**Type:** `{node_type}`\n"
-                result += f"**Version:** {schema.get('version', 'N/A')}\n\n"
+                result += f"**Version:** {schema.get('typeVersion', 1)}\n"
+                result += f"**Usage Count:** {schema['usage_count']} times in workflows\n\n"
 
-                if schema.get('description'):
-                    result += f"## Description\n\n{schema['description']}\n\n"
+                # Parameters
+                seen_params = schema.get('seen_parameters', [])
+                param_types = schema.get('parameter_types', {})
 
-                # Operations (for nodes with operations)
-                if 'properties' in schema:
-                    properties = schema['properties']
+                if seen_params:
+                    result += f"## Parameters ({len(seen_params)})\n\n"
+                    result += f"Discovered from real workflow usage:\n\n"
 
-                    # Check for operations
-                    if any(prop.get('name') == 'operation' for prop in properties):
-                        operation_prop = next((p for p in properties if p.get('name') == 'operation'), None)
-                        if operation_prop and 'options' in operation_prop:
-                            result += f"## Available Operations ({len(operation_prop['options'])})\n\n"
-                            for op in operation_prop['options']:
-                                result += f"### {op.get('name', 'Unknown')}\n"
-                                result += f"- **Value:** `{op.get('value', '')}`\n"
-                                if op.get('description'):
-                                    result += f"- **Description:** {op['description']}\n"
-                                result += "\n"
+                    for param in sorted(seen_params):
+                        param_type = param_types.get(param, 'unknown')
+                        result += f"- **{param}** (type: `{param_type}`)\n"
 
-                    # Check for resource
-                    if any(prop.get('name') == 'resource' for prop in properties):
-                        resource_prop = next((p for p in properties if p.get('name') == 'resource'), None)
-                        if resource_prop and 'options' in resource_prop:
-                            result += f"## Available Resources ({len(resource_prop['options'])})\n\n"
-                            for res in resource_prop['options']:
-                                result += f"- **{res.get('name', 'Unknown')}** (`{res.get('value', '')}`)\n"
-                            result += "\n"
-
-                    # All parameters
-                    result += f"## Parameters ({len(properties)})\n\n"
-                    for prop in properties:
-                        prop_name = prop.get('displayName', prop.get('name', 'Unknown'))
-                        prop_type = prop.get('type', 'unknown')
-                        required = '**Required**' if prop.get('required') else 'Optional'
-
-                        result += f"### {prop_name}\n"
-                        result += f"- **Field Name:** `{prop.get('name', '')}`\n"
-                        result += f"- **Type:** `{prop_type}`\n"
-                        result += f"- **Status:** {required}\n"
-
-                        if prop.get('description'):
-                            result += f"- **Description:** {prop['description']}\n"
-
-                        if prop.get('default') is not None:
-                            result += f"- **Default:** `{prop['default']}`\n"
-
-                        # Options (for select/dropdown fields)
-                        if 'options' in prop and isinstance(prop['options'], list):
-                            result += f"- **Options:** {len(prop['options'])} available\n"
-                            if len(prop['options']) <= 10:
-                                for opt in prop['options']:
-                                    if isinstance(opt, dict):
-                                        result += f"  - `{opt.get('value', '')}`: {opt.get('name', '')}\n"
-                            else:
-                                result += f"  - (Use schema to see all {len(prop['options'])} options)\n"
-
-                        result += "\n"
+                    result += "\n"
+                else:
+                    result += "## Parameters\n\nNo parameters discovered yet.\n\n"
 
                 # Credentials
-                if 'credentials' in schema and schema['credentials']:
-                    result += f"## Required Credentials ({len(schema['credentials'])})\n\n"
-                    for cred in schema['credentials']:
-                        result += f"- **{cred.get('displayName', 'Unknown')}**\n"
-                        result += f"  - Type: `{cred.get('name', '')}`\n"
-                        if cred.get('required'):
-                            result += "  - Required: Yes\n"
-                        result += "\n"
+                credentials = schema.get('credentials')
+                if credentials:
+                    result += f"## Credentials\n\n"
+                    result += f"```json\n{json.dumps(credentials, indent=2)}\n```\n\n"
 
-                # Inputs/Outputs
-                if 'inputs' in schema:
-                    result += f"## Inputs\n\n"
-                    if isinstance(schema['inputs'], list):
-                        result += f"- Accepts {len(schema['inputs'])} input(s)\n"
-                    else:
-                        result += f"- {schema['inputs']}\n"
-                    result += "\n"
+                result += f"## 📊 Usage Insights\n\n"
+                result += f"This node has been used **{schema['usage_count']} times** across analyzed workflows.\n"
+                result += f"Total parameters observed: **{len(seen_params)}**\n\n"
 
-                if 'outputs' in schema:
-                    result += f"## Outputs\n\n"
-                    if isinstance(schema['outputs'], list):
-                        result += f"- Provides {len(schema['outputs'])} output(s)\n"
-                    else:
-                        result += f"- {schema['outputs']}\n"
-                    result += "\n"
+                result += f"💡 **Tip:** These schemas are learned from real workflows. "
+                result += f"Run `discover_nodes` periodically to update knowledge.\n"
 
                 return [TextContent(type="text", text=result)]
 
-            elif name == "search_node_types":
-                query = arguments["query"].lower()
+            elif name == "search_nodes":
+                query = arguments["query"]
 
-                # Get all node types
-                node_types = await n8n_client.get_node_types()
-
-                # Search in name, displayName, and description
-                matches = []
-                for node in node_types:
-                    node_name = node.get('name', '').lower()
-                    display_name = node.get('displayName', '').lower()
-                    description = node.get('description', '').lower()
-
-                    if (query in node_name or
-                        query in display_name or
-                        query in description):
-                        matches.append(node)
+                # Search discovered nodes
+                matches = node_discovery.search_nodes(query)
 
                 if not matches:
                     return [TextContent(
                         type="text",
-                        text=f"❌ No node types found matching '{query}'.\n\nTry:\n- Different keywords\n- Broader search terms\n- Use `get_node_types` to see all available nodes"
+                        text=f"❌ No nodes found matching '{query}'.\n\n"
+                             f"💡 Tips:\n"
+                             f"- Try different keywords\n"
+                             f"- Run `discover_nodes` to update node knowledge\n"
+                             f"- Use `recommend_nodes_for_task` for task-based recommendations"
                     )]
 
                 result = f"# 🔎 Search Results for '{query}' ({len(matches)} matches)\n\n"
 
-                for node in sorted(matches, key=lambda x: x.get('displayName', '')):
-                    result += f"## {node.get('displayName', 'Unknown')}\n"
-                    result += f"- **Type:** `{node.get('name', '')}`\n"
-                    result += f"- **Version:** {node.get('version', 'N/A')}\n"
-                    if node.get('description'):
-                        result += f"- **Description:** {node['description']}\n"
+                for match in matches:
+                    result += f"## {match['name'] or match['type']}\n"
+                    result += f"- **Type:** `{match['type']}`\n"
+                    result += f"- **Usage Count:** {match['usage_count']} times\n"
+                    result += f"- **Parameters:** {match['parameters']} discovered\n"
+                    result += f"- **Version:** {match['typeVersion']}\n"
                     result += "\n"
 
-                result += f"\n💡 **Tip:** Use `get_node_type_schema(node_type)` to see detailed schema for any node.\n"
+                result += f"💡 **Tip:** Use `get_node_schema('{matches[0]['type']}')` to see detailed parameters.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "recommend_nodes_for_task":
+                task_description = arguments["task_description"]
+                top_k = arguments.get("top_k", 5)
+
+                # Initialize recommender if needed
+                if node_recommender is None:
+                    if not node_discovery.discovered_nodes:
+                        return [TextContent(
+                            type="text",
+                            text=f"❌ No nodes discovered yet.\n\n"
+                                 f"💡 Run `discover_nodes` first to analyze workflows and build recommendations."
+                        )]
+                    node_recommender = NodeRecommender(node_discovery)
+
+                # Get recommendations
+                recommendations = node_recommender.recommend_for_task(task_description, top_k)
+
+                if not recommendations:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ No recommendations found for: '{task_description}'\n\n"
+                             f"💡 Try:\n"
+                             f"- More descriptive task description\n"
+                             f"- Different keywords\n"
+                             f"- Run `search_nodes` to browse available nodes"
+                    )]
+
+                result = f"# 💡 Node Recommendations for Task\n\n"
+                result += f"**Task:** {task_description}\n"
+                result += f"**Found:** {len(recommendations)} matching nodes\n\n"
+
+                for i, rec in enumerate(recommendations, 1):
+                    result += f"## {i}. {rec['name'] or rec['type']}\n"
+                    result += f"- **Type:** `{rec['type']}`\n"
+                    result += f"- **Score:** {rec['score']:.1f}/10\n"
+                    result += f"- **Usage Count:** {rec['usage_count']} times\n"
+                    result += f"- **Reason:** {rec['reason']}\n"
+                    result += "\n"
+
+                result += f"💡 **Next Steps:**\n"
+                result += f"- Use `get_node_schema('{recommendations[0]['type']}')` to see parameters\n"
+                result += f"- Use `generate_workflow` to create a workflow with these nodes\n"
 
                 return [TextContent(type="text", text=result)]
 
