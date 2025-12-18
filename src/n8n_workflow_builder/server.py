@@ -341,7 +341,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 description=(
                     "✏️ Update an existing workflow. Modify workflow properties like name, "
                     "nodes, connections, or settings. Can rename workflows or make structural changes. "
-                    "Note: The 'active' field is read-only and cannot be changed via API - use the n8n UI instead."
+                    "Note: The 'active' field is read-only and cannot be changed via API - use the n8n UI instead. "
+                    "IMPORTANT: By default, nodes are MERGED (old nodes kept). Use replace_nodes=true to completely replace (removes old ones)."
                 ),
                 inputSchema={
                     "type": "object",
@@ -365,6 +366,10 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         "settings": {
                             "type": "object",
                             "description": "Optional: Workflow settings"
+                        },
+                        "replace_nodes": {
+                            "type": "boolean",
+                            "description": "Optional: If true, completely replace all nodes (removes old ones). Default: false (merges)"
                         },
                         "tags": {
                             "type": "array",
@@ -2062,6 +2067,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
             elif name == "update_workflow":
                 workflow_id = arguments["workflow_id"]
+                replace_nodes = arguments.get("replace_nodes", False)
 
                 # Build updates dictionary from provided arguments
                 updates = {}
@@ -2084,8 +2090,8 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         text="No updates provided. Please specify at least one field to update (name, active, nodes, connections, settings, or tags)."
                     )]
 
-                # Update the workflow
-                updated_workflow = await n8n_client.update_workflow(workflow_id, updates)
+                # Update the workflow with replace_nodes flag
+                updated_workflow = await n8n_client.update_workflow(workflow_id, updates, replace_nodes=replace_nodes)
 
                 result = f"# Workflow Updated Successfully\n\n"
                 result += f"**ID:** {updated_workflow.get('id', 'N/A')}\n"

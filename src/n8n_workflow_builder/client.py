@@ -244,12 +244,13 @@ class N8nClient:
 
         return result
 
-    async def update_workflow(self, workflow_id: str, updates: Dict) -> Dict:
+    async def update_workflow(self, workflow_id: str, updates: Dict, replace_nodes: bool = False) -> Dict:
         """Update an existing workflow
 
         Args:
             workflow_id: ID of the workflow to update
             updates: Dictionary with fields to update (name, active, nodes, connections, settings, etc.)
+            replace_nodes: If True, completely replace nodes instead of merging (removes old nodes)
 
         Returns:
             Updated workflow data
@@ -276,18 +277,23 @@ class N8nClient:
         # Apply updates - only allow whitelisted fields
         for key, value in updates.items():
             if key in allowed_fields:
-                # Smart merge for nodes: update existing nodes by name, add new ones
+                # Handle nodes update based on replace_nodes flag
                 if key == 'nodes' and isinstance(value, list):
-                    existing_nodes = {node.get('name'): node for node in payload.get('nodes', [])}
-                    for update_node in value:
-                        node_name = update_node.get('name')
-                        if node_name and node_name in existing_nodes:
-                            # Merge: update existing node fields
-                            existing_nodes[node_name].update(update_node)
-                        else:
-                            # Add new node
-                            existing_nodes[update_node.get('name')] = update_node
-                    payload['nodes'] = list(existing_nodes.values())
+                    if replace_nodes:
+                        # Complete replacement: use new nodes directly
+                        payload['nodes'] = value
+                    else:
+                        # Smart merge: update existing nodes by name, add new ones (keeps old nodes)
+                        existing_nodes = {node.get('name'): node for node in payload.get('nodes', [])}
+                        for update_node in value:
+                            node_name = update_node.get('name')
+                            if node_name and node_name in existing_nodes:
+                                # Merge: update existing node fields
+                                existing_nodes[node_name].update(update_node)
+                            else:
+                                # Add new node
+                                existing_nodes[update_node.get('name')] = update_node
+                        payload['nodes'] = list(existing_nodes.values())
                 # Smart merge for connections: merge connection dicts
                 elif key == 'connections' and isinstance(value, dict):
                     if 'connections' not in payload:
