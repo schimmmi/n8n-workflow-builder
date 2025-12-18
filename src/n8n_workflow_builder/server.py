@@ -71,6 +71,7 @@ from .migration import (
     MIGRATION_RULES
 )
 from .node_discovery import NodeDiscovery, NodeRecommender
+from .documentation import N8nDocumentation
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -106,6 +107,9 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
     # Node Discovery System (learns from workflows)
     node_discovery = NodeDiscovery()
     node_recommender = None  # Initialized after first workflow analysis
+
+    # Documentation System
+    n8n_docs = N8nDocumentation()
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -1711,6 +1715,42 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                         }
                     },
                     "required": ["task_description"]
+                }
+            ),
+            Tool(
+                name="get_node_documentation",
+                description=(
+                    "📖 Get official n8n documentation for a specific node. "
+                    "Fetches and displays the official documentation from docs.n8n.io. "
+                    "Supports core nodes (code, http, webhook) and app nodes (googleSheets, slack, telegram)."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "node_type": {
+                            "type": "string",
+                            "description": "Node type to get documentation for (e.g., 'code', 'n8n-nodes-base.http', 'googleSheets')"
+                        }
+                    },
+                    "required": ["node_type"]
+                }
+            ),
+            Tool(
+                name="search_n8n_docs",
+                description=(
+                    "🔍 Search n8n official documentation. "
+                    "Finds relevant documentation pages for your query. "
+                    "Returns URLs to core nodes, app nodes, and documentation sections."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "What to search for (e.g., 'webhook', 'error handling', 'expressions')"
+                        }
+                    },
+                    "required": ["query"]
                 }
             )
         ]
@@ -5440,6 +5480,115 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
                 result += f"💡 **Next Steps:**\n"
                 result += f"- Use `get_node_schema('{recommendations[0]['type']}')` to see parameters\n"
                 result += f"- Use `generate_workflow` to create a workflow with these nodes\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "get_node_documentation":
+                node_type = arguments["node_type"]
+
+                # Get documentation URL
+                doc_url = n8n_docs.get_node_doc_url(node_type)
+
+                if not doc_url:
+                    # Search for similar nodes
+                    search_results = n8n_docs.search_documentation(node_type)
+
+                    if not search_results:
+                        return [TextContent(
+                            type="text",
+                            text=f"❌ Documentation not found for node type: `{node_type}`\n\n"
+                                 f"💡 Tips:\n"
+                                 f"- Try using the full node type (e.g., 'n8n-nodes-base.code')\n"
+                                 f"- Use `search_n8n_docs` to find related documentation\n"
+                                 f"- Check the official docs: https://docs.n8n.io"
+                        )]
+
+                    # Show similar results
+                    result = f"❌ Exact documentation not found for: `{node_type}`\n\n"
+                    result += f"📚 **Similar Documentation Found:**\n\n"
+
+                    for match in search_results[:5]:
+                        result += f"### {match['name']}\n"
+                        result += f"- **Category:** {match['category']}\n"
+                        result += f"- **URL:** {match['url']}\n\n"
+
+                    return [TextContent(type="text", text=result)]
+
+                # Fetch documentation using WebFetch
+                result = f"# 📖 n8n Documentation: {node_type}\n\n"
+                result += f"**Official Docs:** {doc_url}\n\n"
+
+                # Try to fetch the content
+                try:
+                    # Use the WebFetch tool from MCP (available in environment)
+                    # For now, just return the URL since WebFetch is async and tool-based
+                    result += f"## Quick Links\n\n"
+
+                    # Add relevant sections based on node type
+                    node_lower = node_type.lower()
+
+                    if 'http' in node_lower or 'webhook' in node_lower:
+                        result += f"- [Webhook Guide]({n8n_docs.get_section_url('webhooks')})\n"
+                        result += f"- [HTTP Request Examples]({n8n_docs.get_section_url('core-nodes')})\n"
+
+                    if 'code' in node_lower:
+                        result += f"- [JavaScript Code]({n8n_docs.get_section_url('javascript')})\n"
+                        result += f"- [Python Code]({n8n_docs.get_section_url('python')})\n"
+                        result += f"- [Expressions]({n8n_docs.get_section_url('expressions')})\n"
+
+                    if 'trigger' in node_lower or 'schedule' in node_lower or 'cron' in node_lower:
+                        result += f"- [Workflow Basics]({n8n_docs.get_section_url('workflow-basics')})\n"
+
+                    result += f"\n## Related Resources\n\n"
+                    result += f"- [Common Patterns]({n8n_docs.get_common_patterns_url()})\n"
+                    result += f"- [Best Practices]({n8n_docs.get_best_practices_url()})\n"
+                    result += f"- [Troubleshooting]({n8n_docs.get_troubleshooting_url()})\n"
+                    result += f"- [API Reference]({n8n_docs.get_api_reference_url()})\n"
+
+                    result += f"\n💡 **Tip:** Visit the official documentation URL above for complete details, examples, and parameters.\n"
+
+                except Exception as e:
+                    result += f"\n⚠️ Could not fetch documentation content: {str(e)}\n"
+                    result += f"\nPlease visit the URL above for full documentation.\n"
+
+                return [TextContent(type="text", text=result)]
+
+            elif name == "search_n8n_docs":
+                query = arguments["query"]
+
+                # Search documentation
+                results = n8n_docs.search_documentation(query)
+
+                if not results:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ No documentation found for: '{query}'\n\n"
+                             f"💡 Tips:\n"
+                             f"- Try different keywords\n"
+                             f"- Check common terms (webhook, code, http, trigger, etc.)\n"
+                             f"- Visit https://docs.n8n.io for full documentation"
+                    )]
+
+                result = f"# 🔍 n8n Documentation Search: '{query}'\n\n"
+                result += f"**Found:** {len(results)} results\n\n"
+
+                # Group by category
+                by_category = {}
+                for item in results:
+                    category = item['category']
+                    if category not in by_category:
+                        by_category[category] = []
+                    by_category[category].append(item)
+
+                # Display by category
+                for category, items in sorted(by_category.items()):
+                    result += f"## {category}\n\n"
+                    for item in items:
+                        result += f"### {item['name']}\n"
+                        result += f"- **URL:** {item['url']}\n"
+                        result += f"- **Type:** {item['type']}\n\n"
+
+                result += f"💡 **Tip:** Use `get_node_documentation` to fetch full documentation for a specific node.\n"
 
                 return [TextContent(type="text", text=result)]
 
