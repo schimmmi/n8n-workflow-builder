@@ -1903,7 +1903,17 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
 
                 result += "## Nodes:\n\n"
                 for node in workflow.get('nodes', []):
-                    result += f"- **{node['name']}** ({node['type']})\n"
+                    result += f"### {node['name']} ({node['type']})\n\n"
+
+                    # Include node parameters (where Code Node scripts are located)
+                    if 'parameters' in node and node['parameters']:
+                        result += "**Parameters:**\n```json\n"
+                        result += json.dumps(node['parameters'], indent=2)
+                        result += "\n```\n\n"
+
+                    # Include position info
+                    if 'position' in node:
+                        result += f"**Position:** [{node['position'][0]}, {node['position'][1]}]\n\n"
 
                 return [TextContent(type="text", text=result)]
             
