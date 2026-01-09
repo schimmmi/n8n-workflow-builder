@@ -1451,13 +1451,13 @@ For detailed information about the template system, see:
 
 See **[CHANGELOG.md](CHANGELOG.md)** for complete version history and release notes.
 
-**Latest Release**: [v1.22.0 - n8n 2.2.6 Compatibility Update](releases/v1.22.0.md)
+**Latest Release**: [v1.22.1 - Complete n8n 2.2.6 Node Coverage](releases/v1.22.1.md)
 
 ### Recent Releases
+- **[v1.22.1](releases/v1.22.1.md)** - Complete node coverage with 61 nodes (Jan 2025)
 - **[v1.22.0](releases/v1.22.0.md)** - n8n 2.2.6 compatibility (Jan 2025)
 - **[v1.21.0](releases/v1.21.0.md)** - Version tracking system (Dec 2024)
 - **[v1.20.0](releases/v1.20.0.md)** - Documentation access & node replacement (Dec 2024)
-- **[v1.18.0](releases/v1.18.0.md)** - Drift detection & quality monitoring (Dec 2024)
 
 ## 📁 Example Workflows
 

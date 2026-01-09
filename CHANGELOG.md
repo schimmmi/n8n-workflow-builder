@@ -5,6 +5,36 @@ All notable changes to the n8n Workflow Builder MCP Server will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2025-01-09
+
+### 🎉 Added - Complete Node Coverage
+
+**Major Update**: Added 27 nodes and updated 20 versions for 100% n8n 2.2.6 coverage
+
+#### New Nodes (27)
+- **LangChain AI (9)**: agentTool (v2.2), chainLlm (v1.7), lmChatOpenRouter, outputParserStructured (v1.3), openAi (v1.8), mcpClientTool (v1.1), mcpTrigger, toolThink, chatTrigger (v1.1)
+- **AI Agent Tools (8)**: googleCalendarTool (v1.3), googleDocsTool (v2.0), gmailTool (v2.1), linkedInTool, twitterTool (v2.0), facebookGraphApiTool, airtableTool (v2.1), httpRequestTool (v4.2)
+- **Utility (7)**: stickyNote, splitOut, readWriteFile, youTube, googleDrive (v3.0), n8n, oura
+- **Triggers (3)**: telegramTrigger (v1.2), googleDriveTrigger, errorTrigger
+
+#### Version Updates (20)
+- **Core**: googleSheets (4.5→4.6), if (2.0→2.2), switch (3.0→3.2), merge (3.0→3.2), function (1.0→2.0)
+- **LangChain**: agent (1.10→3.0), toolWorkflow (1.1→2.2)
+
+### 📊 Database Stats
+- Total nodes: 34 → **61** (+79%)
+- Core nodes: 18 → **32**
+- LangChain: 12 → **21**
+- Triggers: 3 → **7**
+- New: Tool nodes (8), Utility (4)
+- Version: 2.0.0 → **2.2.0**
+
+### ✅ Results
+- ✅ Unknown nodes: **0** (was ~10)
+- ✅ Version mismatches: **0** (was 96)
+- ✅ Issues: ~200 (was 396, -50%)
+- ✅ Compatible workflows: 58% (25/43)
+
 ## [1.22.0] - 2025-01-09
 
 ### 🎉 Added - n8n 2.2.6 Compatibility
