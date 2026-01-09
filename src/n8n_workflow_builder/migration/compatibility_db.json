@@ -806,6 +806,42 @@
         }
       }
     },
+    "n8n-nodes-base.googleDriveTrigger": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.errorTrigger": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.n8n": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.oura": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
     "n8n-nodes-base.googleCalendarTool": {
       "current_version": 1.3,
       "versions": {
@@ -1205,6 +1241,15 @@
           "issues": []
         }
       }
+    },
+    "@n8n/n8n-nodes-langchain.chatTrigger": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
     }
   },
   "n8n_versions": {
@@ -1300,14 +1345,14 @@
     }
   },
   "metadata": {
-    "version": "2.1.0",
+    "version": "2.2.0",
     "last_updated": "2025-01-09",
-    "total_nodes": 56,
+    "total_nodes": 61,
     "description": "n8n Node Compatibility Database - Tracks breaking changes, deprecated parameters, and migration paths for n8n versions up to 2.2.6",
     "coverage": {
-      "core_nodes": 28,
-      "langchain_nodes": 20,
-      "trigger_nodes": 4,
+      "core_nodes": 32,
+      "langchain_nodes": 21,
+      "trigger_nodes": 7,
       "logic_nodes": 2,
       "tool_nodes": 8,
       "utility_nodes": 4
