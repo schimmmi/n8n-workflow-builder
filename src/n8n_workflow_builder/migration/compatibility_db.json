@@ -665,6 +665,148 @@
         }
       }
     },
+    "n8n-nodes-base.stickyNote": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.splitOut": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.readWriteFile": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.youTube": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.googleDrive": {
+      "current_version": 3.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "2.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "3.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.telegramTrigger": {
+      "current_version": 1.2,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.googleCalendarTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.googleDocsTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.gmailTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.linkedInTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.twitterTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.facebookGraphApiTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.airtableTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "n8n-nodes-base.httpRequestTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
     "n8n-nodes-base.start": {
       "current_version": null,
       "versions": {
@@ -840,6 +982,130 @@
           ]
         }
       }
+    },
+    "@n8n/n8n-nodes-langchain.agentTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.chainLlm": {
+      "current_version": 1.5,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.4": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.5": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.lmChatOpenRouter": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.outputParserStructured": {
+      "current_version": 1.3,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.openAi": {
+      "current_version": 1.5,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.1": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.2": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.3": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.4": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.5": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.mcpClientTool": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.mcpTrigger": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
+    },
+    "@n8n/n8n-nodes-langchain.toolThink": {
+      "current_version": 1.0,
+      "versions": {
+        "1.0": {
+          "status": "compatible",
+          "issues": []
+        }
+      }
     }
   },
   "n8n_versions": {
@@ -935,16 +1201,25 @@
     }
   },
   "metadata": {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "last_updated": "2025-01-09",
-    "total_nodes": 34,
+    "total_nodes": 56,
     "description": "n8n Node Compatibility Database - Tracks breaking changes, deprecated parameters, and migration paths for n8n versions up to 2.2.6",
     "coverage": {
-      "core_nodes": 18,
-      "langchain_nodes": 12,
-      "trigger_nodes": 3,
-      "logic_nodes": 2
+      "core_nodes": 28,
+      "langchain_nodes": 20,
+      "trigger_nodes": 4,
+      "logic_nodes": 2,
+      "tool_nodes": 8,
+      "utility_nodes": 4
     },
-    "n8n_version_support": "0.180.0 - 2.2.6"
+    "n8n_version_support": "0.180.0 - 2.2.6",
+    "new_in_2_1": {
+      "langchain_nodes": ["agentTool", "chainLlm", "lmChatOpenRouter", "outputParserStructured", "openAi", "mcpClientTool", "mcpTrigger", "toolThink"],
+      "tool_variants": ["googleCalendarTool", "googleDocsTool", "gmailTool", "linkedInTool", "twitterTool", "facebookGraphApiTool", "airtableTool", "httpRequestTool"],
+      "utility_nodes": ["stickyNote", "splitOut", "readWriteFile", "youTube"],
+      "google_nodes": ["googleDrive"],
+      "triggers": ["telegramTrigger"]
+    }
   }
 }
