@@ -207,10 +207,11 @@ An **awesome** MCP server for n8n that helps you build, optimize, and debug work
 
 **4 New Tools**: `discover_nodes`, `get_node_schema`, `search_nodes`, `recommend_nodes_for_task`
 
-### 🔄 Migration Engine (NEW!)
+### 🔄 Migration Engine
 - **Automatic Compatibility Checking**: Detects deprecated nodes and parameters in workflows
 - **Smart Migration Rules**: 7 built-in rules for common n8n nodes (HTTP, Postgres, Slack, etc.)
-- **Version Detection**: Identifies compatibility issues with current n8n versions
+- **Version Detection**: Identifies compatibility issues from n8n 0.180.0 to 2.2.6
+- **n8n 2.0+ Support**: Detects removed Start node, disabled ExecuteCommand/LocalFileTrigger, Code node security changes
 - **Dry-Run Mode**: Preview changes before applying migrations
 - **Batch Operations**: Check multiple workflows at once with summary statistics
 - **Severity Levels**: Prioritize fixes by impact (critical, high, medium, low)
@@ -1140,7 +1141,7 @@ rm ~/.n8n_workflow_builder_state.json
 
 ### Server Won't Start
 ```bash
-# Check Python version (should be 3.8+)
+# Check Python version (should be 3.11+)
 python --version
 
 # Reinstall dependencies
@@ -1450,7 +1451,13 @@ For detailed information about the template system, see:
 
 See **[CHANGELOG.md](CHANGELOG.md)** for complete version history and release notes.
 
-**Latest Release**: [v1.18.0 - Drift Detection & Proactive Quality Monitoring](releases/v1.18.0.md)
+**Latest Release**: [v1.22.0 - n8n 2.2.6 Compatibility Update](releases/v1.22.0.md)
+
+### Recent Releases
+- **[v1.22.0](releases/v1.22.0.md)** - n8n 2.2.6 compatibility (Jan 2025)
+- **[v1.21.0](releases/v1.21.0.md)** - Version tracking system (Dec 2024)
+- **[v1.20.0](releases/v1.20.0.md)** - Documentation access & node replacement (Dec 2024)
+- **[v1.18.0](releases/v1.18.0.md)** - Drift detection & quality monitoring (Dec 2024)
 
 ## 📁 Example Workflows
 

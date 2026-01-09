@@ -5,6 +5,56 @@ All notable changes to the n8n Workflow Builder MCP Server will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2025-01-09
+
+### 🎉 Added - n8n 2.2.6 Compatibility
+
+**Major Update**: Full compatibility with n8n version 2.2.6 including all breaking changes from n8n 2.0+
+
+#### Compatibility Database Updates
+- **Version Coverage**: Now tracks n8n versions 0.180.0 through 2.2.6
+- **n8n 2.0 Breaking Changes**:
+  - Start node removed (use Manual Trigger or Execute Workflow Trigger)
+  - Execute Command and LocalFileTrigger nodes disabled by default
+  - Code node security changes (task runners, env var blocking, Python Pyodide removed)
+  - MySQL/MariaDB support dropped (PostgreSQL/SQLite only)
+  - SQLite legacy driver removed (pooling driver only)
+  - OAuth callback authentication required by default
+- **n8n 2.1-2.2 Changes**:
+  - Data Table Node CRUD enhancements
+  - AI Agent Node message handling updates
+  - CORS and path validation improvements
+
+#### Enhanced Node Tracking
+- Added 4 new nodes to compatibility database:
+  - `n8n-nodes-base.start` (removed in 2.0)
+  - `n8n-nodes-base.executeCommand` (disabled by default)
+  - `n8n-nodes-base.localFileTrigger` (disabled by default)
+  - `n8n-nodes-base.dataTable` (enhanced in 2.2)
+- Updated Code node with version 2.1 security tracking
+- Updated AI Agent node with version 1.10 tracking
+
+#### Database Stats
+- Total nodes tracked: 34 (was 30)
+- Core nodes: 18 (was 14)
+- Version milestones: 13 (was 9)
+- Compatibility issues documented: 100+
+
+### 📝 Changed
+- Updated `pyproject.toml` version to 1.22.0
+- Enhanced compatibility database metadata with n8n version support range
+- Updated README.md with n8n 2.2.6 support information
+
+### 📚 Documentation
+- Added complete [v1.22.0 release notes](releases/v1.22.0.md)
+- Updated README with n8n 2.0+ migration guidance
+- Added Python 3.11+ requirement clarification
+
+### ✅ Verified
+- ✅ REST API unchanged in n8n 2.0+ (no client.py updates needed)
+- ✅ All existing MCP server functionality remains compatible
+- ✅ Migration engine detects all n8n 2.0+ breaking changes
+
 ## [1.21.0] - 2025-12-23
 
 ### 🔧 Fixed
