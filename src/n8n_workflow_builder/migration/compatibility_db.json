@@ -1052,7 +1052,7 @@
       }
     },
     "@n8n/n8n-nodes-langchain.openAi": {
-      "current_version": 1.5,
+      "current_version": 1.8,
       "versions": {
         "1.0": {
           "status": "compatible",
@@ -1075,6 +1075,18 @@
           "issues": []
         },
         "1.5": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.6": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.7": {
+          "status": "compatible",
+          "issues": []
+        },
+        "1.8": {
           "status": "compatible",
           "issues": []
         }
