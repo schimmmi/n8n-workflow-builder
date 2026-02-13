@@ -324,3 +324,7 @@ class TemplateAdapter:
     def get_adaptation_log(self) -> List[str]:
         """Get log of all adaptations made"""
         return self.adaptation_log
+
+
+# Global singleton adapter instance
+template_adapter = TemplateAdapter()

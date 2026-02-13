@@ -163,3 +163,7 @@ class TemplateRegistry:
             stats["by_complexity"][complexity] = stats["by_complexity"].get(complexity, 0) + 1
 
         return stats
+
+
+# Global singleton registry instance
+template_registry = TemplateRegistry()

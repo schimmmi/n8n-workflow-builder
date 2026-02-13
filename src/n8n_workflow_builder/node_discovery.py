@@ -259,6 +259,38 @@ class NodeDiscovery:
 
         return popular
 
+    def get_all_node_types(self) -> List[str]:
+        """Get all discovered node types
+        
+        Returns:
+            List of unique node type strings (e.g., ['n8n-nodes-base.webhook', ...])
+        """
+        return list(self.discovered_nodes.keys())
+
+    def get_node_info(self, node_type: str) -> Optional[Dict]:
+        """Get detailed information about a specific node type
+        
+        Args:
+            node_type: The node type (e.g., 'n8n-nodes-base.slack')
+            
+        Returns:
+            Dict with node info or None if not found
+        """
+        schema = self.discovered_nodes.get(node_type)
+        if not schema:
+            return None
+            
+        return {
+            'node_type': node_type,
+            'name': schema.get('name', node_type),
+            'usage_count': self.node_usage_count.get(node_type, 0),
+            'parameters': list(schema.get('seen_parameters', [])),
+            'parameter_types': schema.get('parameter_types', {}),
+            'credentials': schema.get('credentials'),
+            'category': self.node_categories.get(node_type, 'other'),
+            'type_version': schema.get('typeVersion', 1)
+        }
+
     def export_knowledge(self) -> Dict:
         """Export all discovered knowledge as JSON"""
         export = {

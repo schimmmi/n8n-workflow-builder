@@ -352,3 +352,7 @@ class ProvenanceTracker:
             data["last_updated_at"] = datetime.fromisoformat(data["last_updated_at"])
 
         return ProvenanceRecord(**data)
+
+
+# Global singleton provenance tracker instance
+provenance_tracker = ProvenanceTracker()

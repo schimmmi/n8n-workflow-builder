@@ -87,10 +87,10 @@ class N8nClient:
                 logger.info(f"Workflow {workflow_id} is inactive. Activating...")
                 await self.update_workflow(workflow_id, {"active": True})
 
-            # Strategy 1: Try POST to /run endpoint (some n8n versions)
+            # Strategy 1: Try POST to /execute endpoint (current n8n API)
             try:
                 response = await self.client.post(
-                    f"{self.api_url}/api/v1/workflows/{workflow_id}/run",
+                    f"{self.api_url}/api/v1/workflows/{workflow_id}/execute",
                     headers=self.headers,
                     json=data or {}
                 )

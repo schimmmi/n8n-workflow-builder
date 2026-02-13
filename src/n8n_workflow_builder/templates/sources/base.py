@@ -60,6 +60,88 @@ class TemplateMetadata:
     def __post_init__(self):
         if self.deprecated_nodes is None:
             self.deprecated_nodes = []
+    
+    def generate_report(self) -> str:
+        """Generate a detailed report for this template"""
+        report = f"# 📄 Template Details: {self.name}\n\n"
+        report += f"**Template ID:** `{self.id}`\n"
+        report += f"**Source:** {self.source}\n"
+        report += f"**Category:** {self.category}\n"
+        report += f"**Complexity:** {self.complexity}\n"
+        report += f"**Node Count:** {self.node_count}\n"
+        report += f"**Estimated Setup Time:** {self.estimated_setup_time}\n"
+        
+        if self.author:
+            report += f"**Author:** {self.author}\n"
+        if self.source_url:
+            report += f"**Source URL:** {self.source_url}\n"
+        
+        report += f"\n## Description\n\n{self.description}\n\n"
+        
+        if self.purpose:
+            report += f"## Purpose\n\n{self.purpose}\n\n"
+        
+        if self.tags:
+            report += "## Tags\n\n"
+            report += ", ".join(f"`{tag}`" for tag in self.tags)
+            report += "\n\n"
+        
+        if self.assumptions:
+            report += "## Assumptions\n\n"
+            for assumption in self.assumptions:
+                report += f"- {assumption}\n"
+            report += "\n"
+        
+        if self.risks:
+            report += "## Risks\n\n"
+            for risk in self.risks:
+                report += f"- {risk}\n"
+            report += "\n"
+        
+        if self.external_systems:
+            report += "## External Systems\n\n"
+            for system in self.external_systems:
+                report += f"- {system}\n"
+            report += "\n"
+        
+        if self.trigger_type:
+            report += f"## Trigger Type\n\n{self.trigger_type}\n\n"
+        
+        if self.data_flow:
+            report += f"## Data Flow\n\n{self.data_flow}\n\n"
+        
+        report += "## Node Structure\n\n"
+        for idx, node in enumerate(self.nodes, 1):
+            node_name = node.get('name', f'Node {idx}')
+            node_type = node.get('type', 'unknown')
+            report += f"{idx}. **{node_name}** (`{node_type}`)\n"
+        report += "\n"
+        
+        report += "## Quality Indicators\n\n"
+        report += f"- Error Handling: {'✅' if self.has_error_handling else '❌'}\n"
+        report += f"- Documentation: {'✅' if self.has_documentation else '❌'}\n"
+        report += f"- Uses Credentials: {'✅' if self.uses_credentials else '❌'}\n"
+        
+        if self.deprecated_nodes:
+            report += f"\n⚠️ **Warning:** Uses deprecated nodes: {', '.join(self.deprecated_nodes)}\n"
+        
+        report += "\n## Usage Statistics\n\n"
+        report += f"- Total Usage: {self.usage_count} times\n"
+        report += f"- Adaptations: {self.adaptation_count}\n"
+        if self.success_rate is not None:
+            report += f"- Success Rate: {self.success_rate*100:.1f}%\n"
+        
+        report += "\n## Implementation Guide\n\n"
+        report += "1. Use this template as a starting point for your workflow\n"
+        report += "2. Customize node names and parameters to match your requirements\n"
+        report += "3. Configure credentials for nodes that require authentication\n"
+        report += "4. Test with sample data before deploying to production\n"
+        report += "5. Add error handling and monitoring as needed\n\n"
+        
+        report += f"💡 **Compatibility:** Requires n8n {self.n8n_version}\n"
+        
+        return report
+
 
 
 class TemplateSource(ABC):
