@@ -1826,7 +1826,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             workflow_tool_names = {
                 "suggest_workflow_nodes", "generate_workflow_template", "analyze_workflow",
                 "list_workflows", "create_workflow", "update_workflow", "delete_workflow",
-                "get_workflow", "activate_workflow", "deactivate_workflow",
+                "get_workflow", "get_workflow_details", "activate_workflow", "deactivate_workflow",
                 "get_workflow_executions", "execute_workflow", "validate_workflow_structure",
                 "get_workflow_statistics", "clone_workflow"
             }
@@ -1895,7 +1895,7 @@ def create_n8n_server(api_url: str, api_key: str) -> Server:
             }
             
             validation_tool_names = {
-                "validate_workflow", "validate_workflow_json"
+                "validate_workflow", "validate_workflow_json", "analyze_workflow_semantics"
             }
             
             # Route to appropriate handler

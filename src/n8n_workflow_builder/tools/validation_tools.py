@@ -23,6 +23,7 @@ class ValidationTools(BaseTool):
         handlers = {
             "validate_workflow": self.validate_workflow,
             "validate_workflow_json": self.validate_workflow_json,
+            "analyze_workflow_semantics": self.analyze_workflow_semantics,
         }
         
         handler = handlers.get(name)
@@ -252,5 +253,134 @@ class ValidationTools(BaseTool):
         if not errors:
             result += "## ✅ Ready to Create\\n\\n"
             result += "This workflow can be created via `create_workflow` tool.\\n"
-        
+
+        return [TextContent(type="text", text=result)]
+
+    async def analyze_workflow_semantics(self, arguments: dict) -> list[TextContent]:
+        """Deep semantic analysis of workflow logic and anti-patterns
+
+        Args:
+            arguments: {"workflow_id": str}
+
+        Returns:
+            Detailed semantic analysis report with LLM-friendly fix suggestions
+        """
+        workflow_id = arguments["workflow_id"]
+
+        # Fetch workflow
+        try:
+            workflow = await self.deps.client.get_workflow(workflow_id)
+        except Exception as e:
+            if "404" in str(e) or "not found" in str(e).lower():
+                raise ToolError(
+                    "WORKFLOW_NOT_FOUND",
+                    f"Workflow '{workflow_id}' not found",
+                    workflow_id=workflow_id
+                )
+            raise ToolError("API_ERROR", f"Failed to fetch workflow: {str(e)}")
+
+        # Run semantic analysis
+        analysis = self.deps.semantic_analyzer.analyze_workflow_semantics(workflow)
+
+        # Format report
+        result = f"# 🔬 Semantic Analysis: {workflow.get('name', 'Unnamed Workflow')}\n\n"
+
+        # Summary
+        severity = analysis.get('severity', {})
+        total_issues = sum(severity.values())
+
+        if total_issues == 0:
+            result += "## ✅ No Issues Found\n\n"
+            result += "Workflow follows best practices and has no detected anti-patterns.\n\n"
+        else:
+            result += f"## 📊 Summary\n\n"
+            result += f"**Total Issues**: {total_issues}\n"
+            if severity.get('critical', 0) > 0:
+                result += f"- 🔴 **Critical**: {severity['critical']}\n"
+            if severity.get('high', 0) > 0:
+                result += f"- 🟠 **High**: {severity['high']}\n"
+            if severity.get('medium', 0) > 0:
+                result += f"- 🟡 **Medium**: {severity['medium']}\n"
+            if severity.get('low', 0) > 0:
+                result += f"- 🟢 **Low**: {severity['low']}\n"
+            result += "\n"
+
+        # Issues (grouped by severity)
+        issues = analysis.get('issues', [])
+        if issues:
+            # Critical issues
+            critical = [i for i in issues if i['severity'] == 'critical']
+            if critical:
+                result += "## 🔴 Critical Issues\n\n"
+                for issue in critical:
+                    result += f"### {issue['node']}: {issue['issue']}\n\n"
+                    result += f"**Category**: {issue['category']}\n\n"
+                    result += f"{issue['explanation']}\n\n"
+                result += "\n"
+
+            # High severity
+            high = [i for i in issues if i['severity'] == 'high']
+            if high:
+                result += "## 🟠 High Severity Issues\n\n"
+                for issue in high:
+                    result += f"### {issue['node']}: {issue['issue']}\n\n"
+                    result += f"**Category**: {issue['category']}\n\n"
+                    result += f"{issue['explanation']}\n\n"
+                result += "\n"
+
+            # Medium severity
+            medium = [i for i in issues if i['severity'] == 'medium']
+            if medium:
+                result += "## 🟡 Medium Severity Issues\n\n"
+                for issue in medium:
+                    result += f"### {issue['node']}: {issue['issue']}\n\n"
+                    result += f"**Category**: {issue['category']}\n\n"
+                    result += f"{issue['explanation']}\n\n"
+                result += "\n"
+
+            # Low severity
+            low = [i for i in issues if i['severity'] == 'low']
+            if low:
+                result += "## 🟢 Low Severity Issues\n\n"
+                for issue in low:
+                    result += f"### {issue['node']}: {issue['issue']}\n\n"
+                    result += f"**Category**: {issue['category']}\n\n"
+                    result += f"{issue['explanation']}\n\n"
+                result += "\n"
+
+        # LLM-Friendly Fixes
+        llm_fixes = analysis.get('llm_fixes', [])
+        if llm_fixes:
+            result += "## 🔧 Suggested Fixes\n\n"
+            result += "Copy-paste ready fixes for detected issues:\n\n"
+            for fix in llm_fixes:
+                result += f"### {fix['node']}: {fix['issue']}\n\n"
+                result += f"**Category**: {fix['category']}\n\n"
+                result += f"{fix['fix']}\n\n"
+                result += "---\n\n"
+
+        # Anti-patterns
+        anti_patterns = analysis.get('anti_patterns', [])
+        if anti_patterns:
+            result += "## ⚠️ Anti-Patterns Detected\n\n"
+            for pattern in anti_patterns:
+                result += f"- {pattern}\n"
+            result += "\n"
+
+        # Recommendations
+        recommendations = analysis.get('recommendations', [])
+        if recommendations:
+            result += "## 💡 Recommendations\n\n"
+            for rec in recommendations:
+                result += f"- {rec}\n"
+            result += "\n"
+
+        # Log action
+        self.deps.state_manager.log_action("analyze_workflow_semantics", {
+            "workflow_id": workflow_id,
+            "workflow_name": workflow.get('name'),
+            "total_issues": total_issues,
+            "severity": severity
+        })
+
         return [TextContent(type="text", text=result)]

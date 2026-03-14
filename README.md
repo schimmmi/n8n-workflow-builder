@@ -2,6 +2,8 @@
 
 An **awesome** MCP server for n8n that helps you build, optimize, and debug workflows - directly from Claude! 🎯
 
+**Latest Release:** [v1.23.1](releases/v1.23.1.md) (2026-03-14) - Critical Bugfix Release 🐛
+
 ## 🌟 Features
 
 ### 🧠 AI-Powered Workflow Design

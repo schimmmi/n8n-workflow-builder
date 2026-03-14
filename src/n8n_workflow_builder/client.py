@@ -97,7 +97,8 @@ class N8nClient:
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                if e.response.status_code != 404:
+                # 404 = endpoint doesn't exist, 405 = method not allowed (try next strategy)
+                if e.response.status_code not in [404, 405]:
                     raise
 
             # Strategy 2: Try POST to /test endpoint (older versions)
@@ -110,7 +111,8 @@ class N8nClient:
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                if e.response.status_code != 404:
+                # 404 = endpoint doesn't exist, 405 = method not allowed (try next strategy)
+                if e.response.status_code not in [404, 405]:
                     raise
 
             # Strategy 3: Check if workflow has a webhook trigger and provide URL
