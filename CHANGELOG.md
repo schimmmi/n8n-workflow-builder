@@ -5,6 +5,12 @@ All notable changes to the n8n Workflow Builder MCP Server will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.2] - 2026-03-27
+
+### 🐛 Fixed
+
+- **`update_workflow` 400 Bad Request on PUT /workflows/:id**: n8n API rejects internal settings properties (`availableInMCP`, `binaryMode`) that n8n stores internally but does not accept via its public API. Added `ALLOWED_SETTINGS_KEYS` allowlist and filter at both copy-from-current and user-provided settings paths in `client.py`.
+
 ## [1.23.0] - 2026-02-13
 
 ### 🎉 100% Functionality Achieved - Production Ready!
