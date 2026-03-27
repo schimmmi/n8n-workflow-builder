@@ -11,6 +11,14 @@ import httpx
 
 logger = logging.getLogger("n8n-workflow-builder")
 
+# n8n API only accepts these settings keys on PUT /workflows/:id
+# Internal properties like 'availableInMCP' or 'binaryMode' cause 400 errors
+ALLOWED_SETTINGS_KEYS = {
+    "executionOrder", "timezone", "callerPolicy", "errorWorkflow",
+    "saveDataSuccessExecution", "saveDataErrorExecution",
+    "saveManualExecutions", "saveExecutionProgress"
+}
+
 
 class N8nClient:
     """Client for n8n API"""
@@ -274,7 +282,11 @@ class N8nClient:
         # Add optional allowed fields if they exist in current workflow
         for field in ['settings', 'staticData']:
             if field in current_workflow:
-                payload[field] = current_workflow[field]
+                if field == 'settings':
+                    # Filter out internal n8n properties not accepted by PUT API
+                    payload[field] = {k: v for k, v in current_workflow[field].items() if k in ALLOWED_SETTINGS_KEYS}
+                else:
+                    payload[field] = current_workflow[field]
 
         # Apply updates - only allow whitelisted fields
         for key, value in updates.items():
@@ -310,6 +322,9 @@ class N8nClient:
                                     payload['connections'][node_name][output_type] = outputs
                                 else:
                                     payload['connections'][node_name][output_type] = outputs
+                # For settings: filter to allowed keys before applying
+                elif key == 'settings' and isinstance(value, dict):
+                    payload[key] = {k: v for k, v in value.items() if k in ALLOWED_SETTINGS_KEYS}
                 # For other fields: simple replace
                 else:
                     payload[key] = value
